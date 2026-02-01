@@ -1,0 +1,161 @@
+const API_BASE = '/api/admin'
+
+function getToken(): string | null {
+  return localStorage.getItem('admin_token')
+}
+
+export async function api<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getToken()
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  }
+  if (token) (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  if (res.status === 401) {
+    localStorage.removeItem('admin_token')
+    window.dispatchEvent(new Event('admin-logout'))
+    throw new Error('Unauthorized')
+  }
+  const text = await res.text()
+  if (!res.ok) {
+    let msg = res.statusText
+    try {
+      const j = JSON.parse(text)
+      if (j?.error) msg = j.error
+    } catch {
+      if (text) msg = text
+    }
+    throw new Error(msg)
+  }
+  if (res.status === 204 || !text) return undefined as T
+  return JSON.parse(text) as T
+}
+
+export const adminApi = {
+  auth: {
+    login: (username: string, password: string) =>
+      api<{ token: string; expiresIn: number; admin: { id: number } }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      }),
+  },
+  contest: {
+    list: (params?: { page?: number; size?: number; filters?: object }) => {
+      const q = new URLSearchParams()
+      if (params?.page != null) q.set('page', String(params.page))
+      if (params?.size != null) q.set('size', String(params.size))
+      if (params?.filters) q.set('filters', JSON.stringify(params.filters))
+      const query = q.toString()
+      return api<Contest[]>(`/contest${query ? `?${query}` : ''}`)
+    },
+    getById: (id: number) => api<ContestWithRules>(`/contest/${id}`),
+    create: (data: ContestCreate) => api<Contest>('/contest', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: ContestUpdate) => api<Contest>(`/contest/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => api<void>(`/contest/${id}`, { method: 'DELETE' }),
+  },
+  prizeRule: {
+    list: (contestId: number) => api<ContestPrizeRule[]>(`/prize-rule?contestId=${contestId}`),
+    getById: (id: number) => api<ContestPrizeRule>(`/prize-rule/${id}`),
+    create: (data: PrizeRuleCreate) => api<ContestPrizeRule>('/prize-rule', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: PrizeRuleUpdate) => api<ContestPrizeRule>(`/prize-rule/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => api<void>(`/prize-rule/${id}`, { method: 'DELETE' }),
+  },
+  prize: {
+    listClaims: (params?: { page?: number; size?: number; filters?: object }) =>
+      api<ContestPrizeClaim[]>('/prize/claim', {
+        method: 'POST',
+        body: JSON.stringify({ page: params?.page ?? 1, size: params?.size ?? 50, filters: params?.filters ?? {} }),
+      }),
+    updateClaimStatus: (claimId: number, status: PrizeClaimStatus) =>
+      api<ContestPrizeClaim>(`/prize/claim/${claimId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+  },
+}
+
+// Types (aligned with backend/Prisma)
+export type ContestScope = 'CITY' | 'PROVINCE' | 'DISTRICT'
+export type ContestFreq = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+export type ContestAudience = 'ADULTS' | 'YOUTH'
+export type ContestStatus = 'SCHEDULED' | 'ONGOING' | 'FINALIZING' | 'FINALIZED' | 'CANCELED'
+
+export interface Contest {
+  id: number
+  title: string
+  scope: ContestScope
+  regionCode: string
+  heatLevel: number
+  frequency: ContestFreq
+  audience: ContestAudience
+  status: ContestStatus
+  rewardTopN: number
+  prizeMin: number
+  prizeMax: number
+  startAt: string
+  endAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ContestWithRules extends Contest {
+  ContestPrizeRule: ContestPrizeRule[]
+}
+
+export interface ContestCreate {
+  title: string
+  scope: ContestScope
+  regionCode: string
+  heatLevel: number
+  frequency: ContestFreq
+  audience?: ContestAudience
+  status?: ContestStatus
+  rewardTopN?: number
+  prizeMin: number
+  prizeMax: number
+  startAt: string
+  endAt: string
+}
+
+export type ContestUpdate = Partial<ContestCreate>
+
+export interface ContestPrizeRule {
+  id: number
+  contestId: number
+  rankStart: number
+  rankEnd: number
+  prizeValueCent: number
+  audience: ContestAudience | null
+}
+
+export interface PrizeRuleCreate {
+  contestId: number
+  rankStart: number
+  rankEnd: number
+  prizeValueCent: number
+  audience?: ContestAudience | null
+}
+
+export type PrizeRuleUpdate = Partial<Omit<PrizeRuleCreate, 'contestId'>>
+
+export type PrizeClaimStatus = 'PENDING_INFO' | 'SUBMITTED' | 'VERIFIED' | 'SHIPPED' | 'COMPLETED' | 'REJECTED'
+
+export interface ContestPrizeClaim {
+  id: number
+  contestId: number
+  userId: number
+  rank: number
+  steps: number
+  prizeValueCent: number | null
+  csWechatId: string | null
+  status: PrizeClaimStatus
+  useMultiple: boolean
+  note: string | null
+  createdAt: string
+  updatedAt: string
+}
