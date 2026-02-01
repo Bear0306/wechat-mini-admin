@@ -6,7 +6,12 @@ interface DashboardSidebarProps {
 }
 
 const menu: { id: View; label: string }[] = [
-  { id: 'contests', label: 'Contests & Prize Rules' },
+  { id: 'events', label: 'Event Management' },
+  { id: 'ranking', label: 'Ranking & Results' },
+  { id: 'reward', label: 'Reward & Claim Management' },
+  { id: 'user', label: 'User Management' },
+  { id: 'serviceAgent', label: 'Service Agent Management' },
+  { id: 'system', label: 'System Configuration' },
 ]
 
 export default function DashboardSidebar({ view, onSelect }: DashboardSidebarProps) {

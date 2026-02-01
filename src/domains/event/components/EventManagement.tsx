@@ -1,18 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  adminApi,
   type Contest,
   type ContestWithRules,
-  type ContestPrizeRule,
   type ContestCreate,
   type ContestUpdate,
+  type ContestPrizeRule,
   type PrizeRuleCreate,
-  type PrizeRuleUpdate,
   type ContestScope,
   type ContestFreq,
   type ContestAudience,
   type ContestStatus,
-} from '../api/client'
+} from '../../../api/client'
+import * as eventService from '../services/eventService'
 
 const SCOPES: ContestScope[] = ['CITY', 'PROVINCE', 'DISTRICT']
 const FREQS: ContestFreq[] = ['DAILY', 'WEEKLY', 'MONTHLY']
@@ -34,7 +33,19 @@ const defaultContestForm: ContestCreate = {
   endAt: '',
 }
 
-export default function ContestCrud() {
+function validateDateRange(freq: ContestFreq, startAt: string, endAt: string): string | null {
+  if (!startAt || !endAt) return 'Start and end dates required'
+  const start = new Date(startAt).getTime()
+  const end = new Date(endAt).getTime()
+  if (end <= start) return 'End must be after start'
+  const dayMs = 24 * 60 * 60 * 1000
+  if (freq === 'DAILY' && end - start > 2 * dayMs) return 'Daily contest should span ≤2 days'
+  if (freq === 'WEEKLY' && (end - start < 6 * dayMs || end - start > 8 * dayMs)) return 'Weekly contest should span ~7 days'
+  if (freq === 'MONTHLY' && (end - start < 28 * dayMs || end - start > 32 * dayMs)) return 'Monthly contest should span ~30 days'
+  return null
+}
+
+export default function EventManagement() {
   const [contests, setContests] = useState<Contest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -49,7 +60,7 @@ export default function ContestCrud() {
     setLoading(true)
     setError('')
     try {
-      const list = await adminApi.contest.list({ page: 1, size: 100 })
+      const list = await eventService.loadContests()
       setContests(list)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load contests')
@@ -58,13 +69,9 @@ export default function ContestCrud() {
     }
   }, [])
 
-  useEffect(() => {
-    loadContests()
-  }, [loadContests])
-
   const loadSelected = useCallback(async (id: number) => {
     try {
-      const c = await adminApi.contest.getById(id)
+      const c = await eventService.loadContest(id)
       setSelected(c)
       setRules(c.ContestPrizeRule ?? [])
       setForm({
@@ -87,6 +94,10 @@ export default function ContestCrud() {
     }
   }, [])
 
+  useEffect(() => {
+    loadContests()
+  }, [loadContests])
+
   const handleCreate = () => {
     setSelected(null)
     setForm(defaultContestForm)
@@ -100,8 +111,9 @@ export default function ContestCrud() {
   }
 
   const handleSaveContest = async () => {
-    if (!form.startAt || !form.endAt) {
-      setError('Start and end dates required')
+    const dateErr = validateDateRange(form.frequency, form.startAt, form.endAt)
+    if (dateErr) {
+      setError(dateErr)
       return
     }
     setSaving(true)
@@ -109,10 +121,10 @@ export default function ContestCrud() {
     try {
       if (selected) {
         const update: ContestUpdate = { ...form }
-        await adminApi.contest.update(selected.id, update)
+        await eventService.updateContest(selected.id, update)
         await loadSelected(selected.id)
       } else {
-        const created = await adminApi.contest.create(form)
+        const created = await eventService.createContest(form)
         await loadContests()
         await loadSelected(created.id)
       }
@@ -129,7 +141,7 @@ export default function ContestCrud() {
     setSaving(true)
     setError('')
     try {
-      await adminApi.contest.delete(selected.id)
+      await eventService.deleteContest(selected.id)
       setSelected(null)
       setRules([])
       await loadContests()
@@ -145,7 +157,7 @@ export default function ContestCrud() {
     setSaving(true)
     setError('')
     try {
-      await adminApi.prizeRule.create({
+      await eventService.createPrizeRule({
         contestId: selected.id,
         rankStart: ruleForm.rankStart,
         rankEnd: ruleForm.rankEnd,
@@ -161,25 +173,12 @@ export default function ContestCrud() {
     }
   }
 
-  const handleUpdateRule = async (id: number, data: PrizeRuleUpdate) => {
-    setSaving(true)
-    setError('')
-    try {
-      await adminApi.prizeRule.update(id, data)
-      if (selected) await loadSelected(selected.id)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update rule failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleDeleteRule = async (id: number) => {
     if (!confirm('Delete this prize rule?')) return
     setSaving(true)
     setError('')
     try {
-      await adminApi.prizeRule.delete(id)
+      await eventService.deletePrizeRule(id)
       if (selected) await loadSelected(selected.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed')
@@ -191,7 +190,7 @@ export default function ContestCrud() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-100">Contests & Prize Rules</h2>
+        <h2 className="text-lg font-semibold text-slate-100">Event Management</h2>
         <button
           type="button"
           onClick={handleCreate}
@@ -223,7 +222,7 @@ export default function ContestCrud() {
                           selected?.id === c.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-300 hover:bg-slate-700/50'
                         }`}
                       >
-                        {c.title} ({c.status})
+                        {c.title} ({c.frequency} / {c.status})
                       </button>
                     </li>
                   ))}
@@ -322,15 +321,13 @@ export default function ContestCrud() {
                   {rules.map((r) => (
                     <li key={r.id} className="py-2 flex items-center justify-between text-sm">
                       <span className="text-slate-300">Rank {r.rankStart}–{r.rankEnd}: {r.prizeValueCent}¢ {r.audience ? `(${r.audience})` : ''}</span>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRule(r.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRule(r.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        Delete
+                      </button>
                     </li>
                   ))}
                 </ul>

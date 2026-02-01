@@ -76,6 +76,40 @@ export const adminApi = {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       }),
+    assignAgent: (claimId: number, agentId: number | null) =>
+      api<ContestPrizeClaim>(`/prize/claim/${claimId}/agent`, {
+        method: 'PATCH',
+        body: JSON.stringify({ agentId }),
+      }),
+  },
+  user: {
+    getById: (id: number) => api<AdminUser>(`/user/${id}`),
+    update: (id: number, data: AdminUserUpdate) =>
+      api<AdminUser>(`/user/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  leaderboard: {
+    getContestRanking: (contestId: number, topN?: number, tailCount?: number) => {
+      const q = new URLSearchParams()
+      if (topN != null) q.set('topN', String(topN))
+      if (tailCount != null) q.set('tailCount', String(tailCount))
+      const query = q.toString()
+      return api<ContestRanking>(`/leaderboard/contest/${contestId}${query ? `?${query}` : ''}`)
+    },
+  },
+  serviceAgent: {
+    list: () => api<ServiceAgent[]>('/service-agent'),
+    listActive: () => api<ServiceAgent[]>('/service-agent/active'),
+    getById: (id: number) => api<ServiceAgent>(`/service-agent/${id}`),
+    create: (data: ServiceAgentCreate) =>
+      api<ServiceAgent>('/service-agent', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: ServiceAgentUpdate) =>
+      api<ServiceAgent>(`/service-agent/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => api<void>(`/service-agent/${id}`, { method: 'DELETE' }),
+  },
+  system: {
+    getConfig: () => api<SystemConfig>('/system'),
+    updateConfig: (data: Partial<SystemConfig>) =>
+      api<SystemConfig>('/system', { method: 'PUT', body: JSON.stringify(data) }),
   },
 }
 
@@ -153,9 +187,79 @@ export interface ContestPrizeClaim {
   steps: number
   prizeValueCent: number | null
   csWechatId: string | null
+  assignedAgentId: number | null
+  assignedAgent?: { id: number; name: string } | null
   status: PrizeClaimStatus
   useMultiple: boolean
   note: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface AdminUser {
+  id: number
+  openid: string
+  wechatNick: string | null
+  avatarUrl: string | null
+  canParticipate: boolean
+  isPromoter: boolean
+  totalRewardsCent: number
+  joinCount: number
+  prizeMultiplier: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminUserUpdate {
+  isPromoter?: boolean
+  canParticipate?: boolean
+  totalRewardsCent?: number
+}
+
+export type RankRow = { rank: number; userId: number; name: string; steps: number; avatar?: string | null; abnormal?: boolean }
+
+export interface ContestRanking {
+  contestId: number
+  contestTitle: string
+  totalEntries: number
+  top: RankRow[]
+  tail: RankRow[]
+}
+
+export interface ServiceAgent {
+  id: number
+  name: string
+  wechatId: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ServiceAgentCreate {
+  name: string
+  wechatId?: string | null
+}
+
+export interface ServiceAgentUpdate {
+  name?: string
+  wechatId?: string | null
+  isActive?: boolean
+}
+
+export interface DefaultRewardTier {
+  rankStart: number
+  rankEnd: number
+  prizeValueCent: number
+}
+
+export interface DefaultRankLimits {
+  topN: number
+  tailCount: number
+}
+
+export interface SystemConfig {
+  defaultRewardTiers: DefaultRewardTier[]
+  defaultRankLimits: DefaultRankLimits
+  membershipDisabled: boolean
+  rewardRulesEnabled: boolean
 }
