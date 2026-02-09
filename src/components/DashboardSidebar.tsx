@@ -11,7 +11,6 @@ const menu: { id: View; label: string }[] = [
   { id: 'reward', label: 'Reward & Claim Management' },
   { id: 'user', label: 'User Management' },
   { id: 'serviceAgent', label: 'Service Agent Management' },
-  { id: 'system', label: 'System Configuration' },
 ]
 
 export default function DashboardSidebar({ view, onSelect }: DashboardSidebarProps) {

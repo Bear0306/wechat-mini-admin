@@ -96,6 +96,10 @@ export const adminApi = {
       return api<ContestRanking>(`/leaderboard/contest/${contestId}${query ? `?${query}` : ''}`)
     },
   },
+  region: {
+    listByLevel: (level: RegionLevel) =>
+      api<Region[]>(`/region?level=${encodeURIComponent(level)}`),
+  },
   serviceAgent: {
     list: () => api<ServiceAgent[]>('/service-agent'),
     listActive: () => api<ServiceAgent[]>('/service-agent/active'),
@@ -106,15 +110,17 @@ export const adminApi = {
       api<ServiceAgent>(`/service-agent/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) => api<void>(`/service-agent/${id}`, { method: 'DELETE' }),
   },
-  system: {
-    getConfig: () => api<SystemConfig>('/system'),
-    updateConfig: (data: Partial<SystemConfig>) =>
-      api<SystemConfig>('/system', { method: 'PUT', body: JSON.stringify(data) }),
-  },
+
 }
 
 // Types (aligned with backend/Prisma)
-export type ContestScope = 'CITY' | 'PROVINCE' | 'DISTRICT'
+export type RegionLevel = 'NONE' | 'CITY' | 'PROVINCE' | 'DISTRICT'
+
+export interface Region {
+  code: string
+  name: string
+  level: RegionLevel
+}
 export type ContestFreq = 'DAILY' | 'WEEKLY' | 'MONTHLY'
 export type ContestAudience = 'ADULTS' | 'YOUTH'
 export type ContestStatus = 'SCHEDULED' | 'ONGOING' | 'FINALIZING' | 'FINALIZED' | 'CANCELED'
@@ -122,15 +128,12 @@ export type ContestStatus = 'SCHEDULED' | 'ONGOING' | 'FINALIZING' | 'FINALIZED'
 export interface Contest {
   id: number
   title: string
-  scope: ContestScope
-  regionCode: string
+  scope: RegionLevel
+  regionCode: string | ""
   heatLevel: number
   frequency: ContestFreq
   audience: ContestAudience
   status: ContestStatus
-  rewardTopN: number
-  prizeMin: number
-  prizeMax: number
   startAt: string
   endAt: string
   createdAt: string
@@ -138,20 +141,16 @@ export interface Contest {
 }
 
 export interface ContestWithRules extends Contest {
-  ContestPrizeRule: ContestPrizeRule[]
+  contestPrizeRule: ContestPrizeRule[]
 }
 
 export interface ContestCreate {
   title: string
-  scope: ContestScope
-  regionCode: string
-  heatLevel: number
+  scope: RegionLevel
+  regionCode: string | ""
   frequency: ContestFreq
   audience?: ContestAudience
   status?: ContestStatus
-  rewardTopN?: number
-  prizeMin: number
-  prizeMax: number
   startAt: string
   endAt: string
 }
@@ -164,7 +163,6 @@ export interface ContestPrizeRule {
   rankStart: number
   rankEnd: number
   prizeValueCent: number
-  audience: ContestAudience | null
 }
 
 export interface PrizeRuleCreate {
@@ -172,12 +170,11 @@ export interface PrizeRuleCreate {
   rankStart: number
   rankEnd: number
   prizeValueCent: number
-  audience?: ContestAudience | null
 }
 
 export type PrizeRuleUpdate = Partial<Omit<PrizeRuleCreate, 'contestId'>>
 
-export type PrizeClaimStatus = 'PENDING_INFO' | 'SUBMITTED' | 'VERIFIED' | 'SHIPPED' | 'COMPLETED' | 'REJECTED'
+export type PrizeClaimStatus = 'PENDING' | 'COMPLETED' | 'REJECTED'
 
 export interface ContestPrizeClaim {
   id: number
@@ -186,9 +183,8 @@ export interface ContestPrizeClaim {
   rank: number
   steps: number
   prizeValueCent: number | null
-  csWechatId: string | null
   assignedAgentId: number | null
-  assignedAgent?: { id: number; name: string } | null
+  assignedAgent?: { id: number; name: string; wechatId: string | null | undefined | "" } | null
   status: PrizeClaimStatus
   useMultiple: boolean
   note: string | null
@@ -229,7 +225,7 @@ export interface ContestRanking {
 export interface ServiceAgent {
   id: number
   name: string
-  wechatId: string | null
+  wechatId: string | null | undefined | ""
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -244,22 +240,4 @@ export interface ServiceAgentUpdate {
   name?: string
   wechatId?: string | null
   isActive?: boolean
-}
-
-export interface DefaultRewardTier {
-  rankStart: number
-  rankEnd: number
-  prizeValueCent: number
-}
-
-export interface DefaultRankLimits {
-  topN: number
-  tailCount: number
-}
-
-export interface SystemConfig {
-  defaultRewardTiers: DefaultRewardTier[]
-  defaultRankLimits: DefaultRankLimits
-  membershipDisabled: boolean
-  rewardRulesEnabled: boolean
 }

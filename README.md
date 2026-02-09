@@ -13,9 +13,9 @@ Admin frontend for the WeChat Mini backend: manage contests, prize rules, and pr
 
 - **Login** via backend admin auth (`POST /api/admin/auth/login`). Session stored in `localStorage`; **logout after 1 hour of inactivity** (timer resets on mouse/keyboard/scroll/touch).
 - **Dashboard** layout: header (with logout), left sidebar menu, main body (contest + prize rule CRUD), bottom panel (prize claims list + status update).
-- **Contest CRUD**: list, create, edit, delete contests. Fields: title, scope, regionCode, heatLevel, frequency, audience, status, rewardTopN, prizeMin, prizeMax, startAt, endAt.
+- **Contest CRUD**: list, create, edit, delete contests. Fields: title, scope, regionCode, heatLevel, frequency, audience, status, startAt, endAt.
 - **ContestPrizeRule CRUD** (per contest): add/delete rules (rankStart, rankEnd, prizeValueCent, optional audience).
-- **ContestPrizeClaim**: list with pagination; update `status` via dropdown (PENDING_INFO, SUBMITTED, VERIFIED, SHIPPED, COMPLETED, REJECTED).
+- **ContestPrizeClaim**: list with pagination; update `status` via dropdown (PENDING, COMPLETED, REJECTED).
 
 ## Setup
 

@@ -6,29 +6,26 @@ import {
   type ContestUpdate,
   type ContestPrizeRule,
   type PrizeRuleCreate,
-  type ContestScope,
+  type Region,
+  type RegionLevel,
   type ContestFreq,
   type ContestAudience,
   type ContestStatus,
 } from '../../../api/client'
 import * as eventService from '../services/eventService'
 
-const SCOPES: ContestScope[] = ['CITY', 'PROVINCE', 'DISTRICT']
+const SCOPES: RegionLevel[] = ['NONE', 'CITY', 'PROVINCE', 'DISTRICT']
 const FREQS: ContestFreq[] = ['DAILY', 'WEEKLY', 'MONTHLY']
 const AUDIENCES: ContestAudience[] = ['ADULTS', 'YOUTH']
 const STATUSES: ContestStatus[] = ['SCHEDULED', 'ONGOING', 'FINALIZING', 'FINALIZED', 'CANCELED']
 
 const defaultContestForm: ContestCreate = {
   title: '',
-  scope: 'CITY',
-  regionCode: '',
-  heatLevel: 0,
+  scope: 'NONE',
+  regionCode: "",
   frequency: 'DAILY',
   audience: 'ADULTS',
   status: 'SCHEDULED',
-  rewardTopN: 10,
-  prizeMin: 0,
-  prizeMax: 0,
   startAt: '',
   endAt: '',
 }
@@ -52,9 +49,19 @@ export default function EventManagement() {
   const [selected, setSelected] = useState<ContestWithRules | null>(null)
   const [form, setForm] = useState<ContestCreate>(defaultContestForm)
   const [rules, setRules] = useState<ContestPrizeRule[]>([])
-  const [ruleForm, setRuleForm] = useState<Partial<PrizeRuleCreate>>({ rankStart: 1, rankEnd: 1, prizeValueCent: 0, audience: null })
+  const [ruleForm, setRuleForm] = useState<Partial<PrizeRuleCreate>>({ rankStart: 1, rankEnd: 1, prizeValueCent: 0 })
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [regions, setRegions] = useState<Region[]>([])
+
+  const loadRegions = useCallback(async (level: RegionLevel) => {
+    try {
+      const list = await eventService.loadRegionsByLevel(level)
+      setRegions(list)
+    } catch {
+      setRegions([])
+    }
+  }, [])
 
   const loadContests = useCallback(async () => {
     setLoading(true)
@@ -73,22 +80,18 @@ export default function EventManagement() {
     try {
       const c = await eventService.loadContest(id)
       setSelected(c)
-      setRules(c.ContestPrizeRule ?? [])
+      setRules(c.contestPrizeRule ?? [])
       setForm({
         title: c.title,
         scope: c.scope,
-        regionCode: c.regionCode,
-        heatLevel: c.heatLevel,
+        regionCode: c.regionCode ?? "",
         frequency: c.frequency,
         audience: c.audience,
         status: c.status,
-        rewardTopN: c.rewardTopN,
-        prizeMin: c.prizeMin,
-        prizeMax: c.prizeMax,
         startAt: c.startAt.slice(0, 16),
         endAt: c.endAt.slice(0, 16),
       })
-      setRuleForm({ contestId: id, rankStart: 1, rankEnd: 1, prizeValueCent: 0, audience: null })
+      setRuleForm({ contestId: id, rankStart: 1, rankEnd: 1, prizeValueCent: 0 })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load contest')
     }
@@ -97,6 +100,12 @@ export default function EventManagement() {
   useEffect(() => {
     loadContests()
   }, [loadContests])
+
+  useEffect(() => {
+    if (editing || (!selected && !loading)) {
+      loadRegions(form.scope)
+    }
+  }, [form.scope, editing, selected, loading, loadRegions])
 
   const handleCreate = () => {
     setSelected(null)
@@ -162,10 +171,9 @@ export default function EventManagement() {
         rankStart: ruleForm.rankStart,
         rankEnd: ruleForm.rankEnd,
         prizeValueCent: ruleForm.prizeValueCent,
-        audience: ruleForm.audience ?? undefined,
       })
       await loadSelected(selected.id)
-      setRuleForm({ contestId: selected.id, rankStart: 1, rankEnd: 1, prizeValueCent: 0, audience: null })
+      setRuleForm({ contestId: selected.id, rankStart: 1, rankEnd: 1, prizeValueCent: 0})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Add rule failed')
     } finally {
@@ -258,7 +266,7 @@ export default function EventManagement() {
                   <dt>Scope</dt>
                   <dd>{selected.scope}</dd>
                   <dt>Region</dt>
-                  <dd>{selected.regionCode}</dd>
+                  <dd>{selected.regionCode ?? ''}</dd>
                   <dt>Frequency</dt>
                   <dd>{selected.frequency}</dd>
                   <dt>Status</dt>
@@ -267,60 +275,124 @@ export default function EventManagement() {
                   <dd>{new Date(selected.startAt).toLocaleString()}</dd>
                   <dt>End</dt>
                   <dd>{new Date(selected.endAt).toLocaleString()}</dd>
-                  <dt>Prize (min–max)</dt>
-                  <dd>{selected.prizeMin}–{selected.prizeMax}¢</dd>
                 </dl>
               </div>
               <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
                 <h3 className="font-medium text-slate-100 mb-3">Prize Rules</h3>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <input
-                    type="number"
-                    min={1}
-                    placeholder="Rank start"
-                    value={ruleForm.rankStart ?? ''}
-                    onChange={(e) => setRuleForm((f) => ({ ...f, rankStart: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                    className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    placeholder="Rank end"
-                    value={ruleForm.rankEnd ?? ''}
-                    onChange={(e) => setRuleForm((f) => ({ ...f, rankEnd: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                    className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="Prize (¢)"
-                    value={ruleForm.prizeValueCent ?? ''}
-                    onChange={(e) => setRuleForm((f) => ({ ...f, prizeValueCent: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                    className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
-                  />
-                  <select
-                    value={ruleForm.audience ?? ''}
-                    onChange={(e) => setRuleForm((f) => ({ ...f, audience: (e.target.value || null) as ContestAudience | null }))}
-                    className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
-                  >
-                    <option value="">Any</option>
-                    {AUDIENCES.map((a) => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAddRule}
-                    disabled={saving}
-                    className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
-                  >
-                    Add Rule
-                  </button>
-                </div>
+                {(() => {
+                  // Determine nextRankStart: 1 + max(rankEnd) if rules exist, else 1
+                  const nextRankStart =
+                    rules.length > 0
+                      ? 1 + Math.max(...rules.map(r => r.rankEnd))
+                      : 1
+
+                  // Determine the minimum prize of existing rules (if any)
+                  const minPrize =
+                    rules.length > 0
+                      ? Math.min(...rules.map(r => r.prizeValueCent ?? 0))
+                      : 0
+
+                  // Always ensure rankEnd >= rankStart (nextRankStart), default to rankStart
+                  const currentRankEnd =
+                    ruleForm.rankEnd !== undefined
+                      ? Math.max(ruleForm.rankEnd, nextRankStart)
+                      : nextRankStart
+
+                  // Prize input: Always default to 0 if undefined (do not default to minPrize)
+                  let currentPrizeValueCent =
+                    ruleForm.prizeValueCent !== undefined
+                      ? Math.max(
+                          0,
+                          rules.length > 0
+                            ? Math.min(ruleForm.prizeValueCent, minPrize)
+                            : ruleForm.prizeValueCent
+                        )
+                      : 0
+
+                  // If rankForm.rankStart out of sync with auto-calculated, set it
+                  if (ruleForm.rankStart !== nextRankStart) {
+                    setTimeout(() =>
+                      setRuleForm(f =>
+                        f.rankStart !== nextRankStart
+                          ? { ...f, rankStart: nextRankStart, rankEnd: nextRankStart }
+                          : f
+                      ),
+                      0
+                    )
+                  }
+
+                  // Do not auto-update prizeValueCent for minPrize, only default to 0 if undefined
+                  if (ruleForm.prizeValueCent === undefined) {
+                    setTimeout(() => {
+                      setRuleForm(f =>
+                        f.prizeValueCent !== 0 ? { ...f, prizeValueCent: 0 } : f
+                      )
+                    }, 0)
+                  }
+
+                  return (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <span>From</span>
+                      <span
+                        className="inline-flex items-center px-2 py-1 w-24 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm cursor-not-allowed"
+                        style={{ userSelect: 'none', pointerEvents: 'none' }}
+                      >
+                        {nextRankStart}
+                      </span>
+                      <span> to</span>
+                      <input
+                        type="number"
+                        min={nextRankStart}
+                        placeholder="Rank end"
+                        value={currentRankEnd}
+                        onChange={e => {
+                          const val = e.target.value ? parseInt(e.target.value, 10) : undefined
+                          setRuleForm(f => ({
+                            ...f,
+                            // Always keep rankStart as nextRankStart, keep rankEnd >= rankStart
+                            rankStart: nextRankStart,
+                            rankEnd: val !== undefined ? Math.max(val, nextRankStart) : nextRankStart
+                          }))
+                        }}
+                        className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
+                      />
+                      <span>: Prize =</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={rules.length > 0 ? minPrize : undefined}
+                        placeholder="Prize (¢)"
+                        value={currentPrizeValueCent}
+                        onChange={e => {
+                          let inputVal = e.target.value ? parseInt(e.target.value, 10) : undefined
+                          // Enforce minimum 0, and if rules exist, also a maximum of minPrize
+                          if (inputVal !== undefined) {
+                            if (inputVal < 0) inputVal = 0
+                            if (rules.length > 0 && inputVal > minPrize) inputVal = minPrize
+                          }
+                          setRuleForm(f => ({
+                            ...f,
+                            prizeValueCent: inputVal
+                          }))
+                        }}
+                        className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleAddRule}
+                        disabled={saving}
+                        className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
+                      >
+                        Add Rule
+                      </button>
+                    </div>
+                  )
+                })()}
                 <ul className="divide-y divide-slate-700">
                   {rules.map((r) => (
                     <li key={r.id} className="py-2 flex items-center justify-between text-sm">
-                      <span className="text-slate-300">Rank {r.rankStart}–{r.rankEnd}: {r.prizeValueCent}¢ {r.audience ? `(${r.audience})` : ''}</span>
+                      <span className="text-slate-300">From {r.rankStart} to {r.rankEnd}: Prize = {r.prizeValueCent}</span>
                       <button
                         type="button"
                         onClick={() => handleDeleteRule(r.id)}
@@ -351,28 +423,33 @@ export default function EventManagement() {
                   <label className="block text-slate-400 mb-1">Scope</label>
                   <select
                     value={form.scope}
-                    onChange={(e) => setForm((f) => ({ ...f, scope: e.target.value as ContestScope }))}
+                    onChange={(e) => {
+                      const scope = e.target.value as RegionLevel
+                      setForm((f) => ({ ...f, scope, regionCode: '' }))
+                    }}
                     className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
                   >
                     {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Region code</label>
-                  <input
-                    value={form.regionCode}
-                    onChange={(e) => setForm((f) => ({ ...f, regionCode: e.target.value }))}
+                  <label className="block text-slate-400 mb-1">Region</label>
+                  <select
+                    value={form.regionCode ?? ''}
+                    onChange={(e) => setForm((f) => ({ ...f, regionCode: e.target.value ?? '' }))}
                     className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Heat level</label>
-                  <input
-                    type="number"
-                    value={form.heatLevel}
-                    onChange={(e) => setForm((f) => ({ ...f, heatLevel: parseInt(e.target.value, 10) || 0 }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
+                  >
+                    <option value="">— Select —</option>
+                    {regions.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.name} ({r.code})
+                      </option>
+                    ))}
+                    {/* Keep current value as option when editing and it's not in the fetched list */}
+                    {form.regionCode && !regions.some((r) => r.code === form.regionCode) && (
+                      <option value={form.regionCode}>{form.regionCode}</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">Frequency</label>
@@ -403,36 +480,6 @@ export default function EventManagement() {
                   >
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Reward top N</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.rewardTopN}
-                    onChange={(e) => setForm((f) => ({ ...f, rewardTopN: parseInt(e.target.value, 10) || 10 }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Prize min (¢)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.prizeMin}
-                    onChange={(e) => setForm((f) => ({ ...f, prizeMin: parseInt(e.target.value, 10) || 0 }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Prize max (¢)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.prizeMax}
-                    onChange={(e) => setForm((f) => ({ ...f, prizeMax: parseInt(e.target.value, 10) || 0 }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">Start (local datetime)</label>

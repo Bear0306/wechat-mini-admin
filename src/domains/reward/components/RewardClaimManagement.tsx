@@ -4,10 +4,7 @@ import { adminApi, type ContestPrizeClaim, type PrizeClaimStatus, type ServiceAg
 import * as rewardService from '../services/rewardService'
 
 const STATUS_OPTIONS: { value: PrizeClaimStatus; label: string }[] = [
-  { value: 'PENDING_INFO', label: 'Pending Info' },
-  { value: 'SUBMITTED', label: 'Submitted' },
-  { value: 'VERIFIED', label: 'Verified' },
-  { value: 'SHIPPED', label: 'Fulfilled' },
+  { value: 'PENDING', label: 'Pending' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'REJECTED', label: 'Rejected' },
 ]

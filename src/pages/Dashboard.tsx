@@ -8,7 +8,6 @@ import RankingResults from '../domains/ranking/components/RankingResults'
 import RewardClaimManagement from '../domains/reward/components/RewardClaimManagement'
 import UserManagement from '../domains/user/components/UserManagement'
 import ServiceAgentManagement from '../domains/serviceAgent/components/ServiceAgentManagement'
-import SystemConfiguration from '../domains/system/components/SystemConfiguration'
 
 export type View =
   | 'events'
@@ -16,7 +15,6 @@ export type View =
   | 'reward'
   | 'user'
   | 'serviceAgent'
-  | 'system'
 
 const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   events: EventManagement,
@@ -24,7 +22,6 @@ const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
   reward: RewardClaimManagement,
   user: UserManagement,
   serviceAgent: ServiceAgentManagement,
-  system: SystemConfiguration,
 }
 
 export default function Dashboard() {

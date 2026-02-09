@@ -7,7 +7,13 @@ import {
   type ContestPrizeRule,
   type PrizeRuleCreate,
   type PrizeRuleUpdate,
+  type Region,
+  type RegionLevel,
 } from '../../../api/client'
+
+export async function loadRegionsByLevel(level: RegionLevel): Promise<Region[]> {
+  return adminApi.region.listByLevel(level)
+}
 
 export async function loadContests(page = 1, size = 100): Promise<Contest[]> {
   return adminApi.contest.list({ page, size })
