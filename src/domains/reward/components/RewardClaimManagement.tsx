@@ -4,9 +4,9 @@ import { adminApi, type ContestPrizeClaim, type PrizeClaimStatus, type ServiceAg
 import * as rewardService from '../services/rewardService'
 
 const STATUS_OPTIONS: { value: PrizeClaimStatus; label: string }[] = [
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'PENDING', label: '待处理' },
+  { value: 'COMPLETED', label: '已完成' },
+  { value: 'REJECTED', label: '已拒绝' },
 ]
 
 const COMPLETED_STATUS = 'COMPLETED'
@@ -32,7 +32,7 @@ export default function RewardClaimManagement() {
       const list = await rewardService.loadClaims(page, 30)
       setClaims(list)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load claims')
+      setError(e instanceof Error ? e.message : '获取领奖记录失败')
     } finally {
       setLoading(false)
     }
@@ -62,7 +62,7 @@ export default function RewardClaimManagement() {
       const updated = await rewardService.updateClaimStatus(claimId, status)
       setClaims((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed')
+      setError(e instanceof Error ? e.message : '更新失败')
     } finally {
       setUpdating(null)
     }
@@ -75,7 +75,7 @@ export default function RewardClaimManagement() {
       const updated = await rewardService.assignAgent(claimId, agentId)
       setClaims((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Assign failed')
+      setError(e instanceof Error ? e.message : '分配失败')
     } finally {
       setUpdating(null)
     }
@@ -97,7 +97,7 @@ export default function RewardClaimManagement() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-100">Reward & Claim Management</h2>
+        <h2 className="text-lg font-semibold text-slate-100">奖品及领奖管理</h2>
         <div className="flex gap-2">
           <button
             type="button"
@@ -105,23 +105,23 @@ export default function RewardClaimManagement() {
             disabled={page <= 1}
             className="px-2 py-1.5 text-sm rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50"
           >
-            Prev
+            上一页
           </button>
-          <span className="text-sm text-slate-500 self-center px-2">Page {page}</span>
+          <span className="text-sm text-slate-500 self-center px-2">第 {page} 页</span>
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
             disabled={claims.length < 30}
             className="px-2 py-1.5 text-sm rounded bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50"
           >
-            Next
+            下一页
           </button>
           <button
             type="button"
             onClick={() => loadClaims()}
             className="px-2 py-1.5 text-sm rounded bg-slate-700 text-slate-300 hover:bg-slate-600"
           >
-            Refresh
+            刷新
           </button>
         </div>
       </div>
@@ -129,50 +129,50 @@ export default function RewardClaimManagement() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-end text-sm mb-2">
         <div>
-          <label className="block text-slate-400 mb-1">ContestId</label>
+          <label className="block text-slate-400 mb-1">竞赛ID</label>
           <input
             type="text"
             className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
             value={filterContestId}
             onChange={e => setFilterContestId(e.target.value.replace(/\D/g, ''))}
-            placeholder="ContestId"
+            placeholder="请输入竞赛ID"
             inputMode="numeric"
             pattern="[0-9]*"
           />
         </div>
         <div>
-          <label className="block text-slate-400 mb-1">UserId</label>
+          <label className="block text-slate-400 mb-1">用户ID</label>
           <input
             type="text"
             className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
             value={filterUserId}
             onChange={e => setFilterUserId(e.target.value.replace(/\D/g, ''))}
-            placeholder="UserId"
+            placeholder="请输入用户ID"
             inputMode="numeric"
             pattern="[0-9]*"
           />
         </div>
         <div>
-          <label className="block text-slate-400 mb-1">Status</label>
+          <label className="block text-slate-400 mb-1">状态</label>
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
             className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
           >
-            <option value="">All</option>
+            <option value="">全部</option>
             {STATUS_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-slate-400 mb-1">Agent</label>
+          <label className="block text-slate-400 mb-1">服务人员</label>
           <select
             value={filterAgent}
             onChange={e => setFilterAgent(e.target.value)}
             className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 min-w-[120px]"
           >
-            <option value="">All</option>
+            <option value="">全部</option>
             {agents.map(a => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
@@ -188,27 +188,27 @@ export default function RewardClaimManagement() {
           <thead>
             <tr className="text-slate-400 border-b border-slate-700 bg-slate-800/50">
               {/* <th className="text-left py-3 px-4 font-medium">ID</th> */}
-              <th className="text-left py-3 px-4 font-medium">Contest</th>
-              <th className="text-left py-3 px-4 font-medium">User</th>
-              <th className="text-left py-3 px-4 font-medium">Rank</th>
-              <th className="text-left py-3 px-4 font-medium">Steps</th>
-              <th className="text-left py-3 px-4 font-medium">Prize (¢)</th>
-              <th className="text-left py-3 px-4 font-medium">Status</th>
-              <th className="text-left py-3 px-4 font-medium">Agent</th>
-              <th className="text-left py-3 px-4 font-medium">Updated</th>
+              <th className="text-left py-3 px-4 font-medium">竞赛</th>
+              <th className="text-left py-3 px-4 font-medium">用户</th>
+              <th className="text-left py-3 px-4 font-medium">名次</th>
+              <th className="text-left py-3 px-4 font-medium">步数</th>
+              <th className="text-left py-3 px-4 font-medium">奖励金额</th>
+              <th className="text-left py-3 px-4 font-medium">状态</th>
+              <th className="text-left py-3 px-4 font-medium">服务人员</th>
+              <th className="text-left py-3 px-4 font-medium">更新时间</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  Loading…
+                  加载中…
                 </td>
               </tr>
             ) : filteredClaims.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No prize claims
+                  暂无领奖记录
                 </td>
               </tr>
             ) : (

@@ -33,7 +33,7 @@ export default function RankingResults({ contestId }: Props) {
         setSelectedContestId(list[0].id)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load contests')
+      setError(e instanceof Error ? e.message : '赛事列表加载失败')
     } finally {
       setLoading(false)
     }
@@ -47,7 +47,7 @@ export default function RankingResults({ contestId }: Props) {
       const r = await rankingService.loadContestRanking(selectedContestId)
       setRanking(r)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load ranking')
+      setError(e instanceof Error ? e.message : '排名数据加载失败')
       setRanking(null)
     } finally {
       setRankingLoading(false)
@@ -63,18 +63,18 @@ export default function RankingResults({ contestId }: Props) {
   }, [loadRanking])
 
   const topColumns = [
-    { key: 'rank', header: 'Rank', render: (r: RankRow) => <span className={r.abnormal ? 'text-amber-400 font-medium' : ''}>{r.rank}</span> },
-    { key: 'userId', header: 'User ID' },
-    { key: 'name', header: 'Name', render: (r: RankRow) => <span className={r.abnormal ? 'text-amber-400 font-medium' : ''}>{r.name}</span> },
-    { key: 'steps', header: 'Steps', render: (r: RankRow) => <span className={r.abnormal ? 'text-amber-400 font-medium' : ''}>{r.steps.toLocaleString()}</span> },
-    { key: 'flag', header: '', render: (r: RankRow) => r.abnormal ? <span className="text-amber-400 text-xs">⚠ abnormal</span> : null },
+    { key: 'rank', header: '排名', render: (r: RankRow) => <span className={r.abnormal ? 'text-amber-400 font-medium' : ''}>{r.rank}</span> },
+    { key: 'userId', header: '用户ID' },
+    { key: 'name', header: '姓名', render: (r: RankRow) => <span className={r.abnormal ? 'text-amber-400 font-medium' : ''}>{r.name}</span> },
+    { key: 'steps', header: '步数', render: (r: RankRow) => <span className={r.abnormal ? 'text-amber-400 font-medium' : ''}>{r.steps.toLocaleString()}</span> },
+    { key: 'flag', header: '', render: (r: RankRow) => r.abnormal ? <span className="text-amber-400 text-xs">⚠ 异常</span> : null },
   ]
 
   const tailColumns = [
-    { key: 'rank', header: 'Rank' },
-    { key: 'userId', header: 'User ID' },
-    { key: 'name', header: 'Name' },
-    { key: 'steps', header: 'Steps', render: (r: RankRow) => r.steps.toLocaleString() },
+    { key: 'rank', header: '排名' },
+    { key: 'userId', header: '用户ID' },
+    { key: 'name', header: '姓名' },
+    { key: 'steps', header: '步数', render: (r: RankRow) => r.steps.toLocaleString() },
   ]
 
   const formatDate = (iso: string | undefined) => {
@@ -86,12 +86,12 @@ export default function RankingResults({ contestId }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-slate-100">Ranking & Results</h2>
+      <h2 className="text-lg font-semibold text-slate-100">排名与成绩</h2>
       {error && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>
       )}
       <div className="flex items-center gap-4 flex-wrap">
-        <label className="text-sm text-slate-400">Event ID</label>
+        <label className="text-sm text-slate-400">赛事ID</label>
           <select
             value={selectedContestId ?? ''}
             onChange={(e) => {
@@ -107,28 +107,28 @@ export default function RankingResults({ contestId }: Props) {
           </select>
         {selectedContest && (
           <div className="text-xs text-slate-400 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 whitespace-nowrap">
-            <span>ID: <span className="text-slate-200">{selectedContest.id}</span></span>
-            <span>Name: <span className="text-slate-200">{selectedContest.title}</span></span>
-            <span>Frequency: <span className="text-slate-200">{selectedContest.frequency}</span></span>
-            <span>Status: <span className="text-slate-200">{selectedContest.status}</span></span>
-            <span>Start: <span className="text-slate-200">{formatDate(selectedContest.startAt)}</span></span>
-            <span>End: <span className="text-slate-200">{formatDate(selectedContest.endAt)}</span></span>
+            <span>赛事ID: <span className="text-slate-200">{selectedContest.id}</span></span>
+            <span>赛事名称: <span className="text-slate-200">{selectedContest.title}</span></span>
+            <span>频率: <span className="text-slate-200">{selectedContest.frequency}</span></span>
+            <span>状态: <span className="text-slate-200">{selectedContest.status}</span></span>
+            <span>开始: <span className="text-slate-200">{formatDate(selectedContest.startAt)}</span></span>
+            <span>结束: <span className="text-slate-200">{formatDate(selectedContest.endAt)}</span></span>
           </div>
         )}
       </div>
       {ranking && (
         <div className="space-y-4">
           <p className="text-sm text-slate-500">
-            {ranking.contestTitle} — {ranking.totalEntries} entries (top {ranking.top.length} + last {ranking.tail.length})
+            {ranking.contestTitle} — 共 {ranking.totalEntries} 条参赛数据（前 {ranking.top.length} 名 + 后 {ranking.tail.length} 名）
           </p>
           <div className="flex flex-col md:flex-row md:space-x-8 space-y-4 md:space-y-0 w-full">
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-slate-400 mb-2">Top N</h3>
+              <h3 className="text-sm font-medium text-slate-400 mb-2">前 N 名</h3>
               <DataTable columns={topColumns} data={ranking.top} keyFn={(r) => r.rank} rowClassName={(r) => r.abnormal ? 'bg-amber-500/10' : ''} />
             </div>
             {ranking.tail.length > 0 && (
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium text-slate-400 mb-2">Trailing</h3>
+                <h3 className="text-sm font-medium text-slate-400 mb-2">末尾数据</h3>
                 <DataTable columns={tailColumns} data={ranking.tail} keyFn={(r) => r.rank} />
               </div>
             )}
@@ -136,10 +136,10 @@ export default function RankingResults({ contestId }: Props) {
         </div>
       )}
       {!ranking && !rankingLoading && selectedContestId && (
-        <p className="text-slate-500 text-sm">No ranking data</p>
+        <p className="text-slate-500 text-sm">暂无排名数据</p>
       )}
       {!selectedContestId && !loading && (
-        <p className="text-slate-500 text-sm">Select an event to view rankings</p>
+        <p className="text-slate-500 text-sm">请选择赛事以查看排名</p>
       )}
     </div>
   )

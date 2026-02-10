@@ -20,7 +20,7 @@ export default function Login() {
       login(res.token)
       navigate('/', { replace: true })
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : '登录失败')
     } finally {
       setLoading(false)
     }
@@ -30,13 +30,13 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-slate-100 tracking-tight">WeChat Mini Admin</h1>
-          <p className="text-slate-400 mt-1 text-sm">Sign in to manage contests and prizes</p>
+          <h1 className="text-2xl font-semibold text-slate-100 tracking-tight">微信小程序后台管理</h1>
+          <p className="text-slate-400 mt-1 text-sm">登录以管理竞赛和奖品</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-1.5">
-              Username
+              用户名
             </label>
             <input
               id="username"
@@ -46,12 +46,12 @@ export default function Login() {
               autoComplete="username"
               required
               className="w-full px-4 py-2.5 rounded-lg bg-slate-850 border border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Admin username"
+              placeholder="管理员用户名"
             />
           </div>
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1.5">
-              Password
+              密码
             </label>
             <input
               id="password"
@@ -61,7 +61,7 @@ export default function Login() {
               autoComplete="current-password"
               required
               className="w-full px-4 py-2.5 rounded-lg bg-slate-850 border border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Password"
+              placeholder="密码"
             />
           </div>
           {error && (
@@ -74,11 +74,11 @@ export default function Login() {
             disabled={loading}
             className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? '正在登录…' : '登录'}
           </button>
         </form>
         <p className="mt-6 text-center text-xs text-slate-500">
-          Session expires after 1 hour of inactivity.
+          会话将在 1 小时不活跃后过期。
         </p>
       </div>
     </div>

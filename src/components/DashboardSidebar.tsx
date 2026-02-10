@@ -6,11 +6,11 @@ interface DashboardSidebarProps {
 }
 
 const menu: { id: View; label: string }[] = [
-  { id: 'events', label: 'Event Management' },
-  { id: 'ranking', label: 'Ranking & Results' },
-  { id: 'reward', label: 'Reward & Claim Management' },
-  { id: 'user', label: 'User Management' },
-  { id: 'serviceAgent', label: 'Service Agent Management' },
+  { id: 'events', label: '赛事管理' },
+  { id: 'ranking', label: '排名与成绩' },
+  { id: 'reward', label: '奖品与兑奖管理' },
+  { id: 'user', label: '用户管理' },
+  { id: 'serviceAgent', label: '客服管理' },
 ]
 
 export default function DashboardSidebar({ view, onSelect }: DashboardSidebarProps) {

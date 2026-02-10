@@ -54,14 +54,14 @@ function inputLocalStrToIso(input: string): string {
 }
 
 function validateDateRange(freq: ContestFreq, startAtIso: string, endAtIso: string): string | null {
-  if (!startAtIso || !endAtIso) return 'Start and end dates required'
+  if (!startAtIso || !endAtIso) return '请填写开始和结束日期'
   const start = new Date(startAtIso).getTime()
   const end = new Date(endAtIso).getTime()
-  if (end <= start) return 'End must be after start'
+  if (end <= start) return '结束时间必须在开始时间之后'
   const dayMs = 24 * 60 * 60 * 1000
-  if (freq === 'DAILY' && end - start > 2 * dayMs) return 'Daily contest should span ≤2 days'
-  if (freq === 'WEEKLY' && (end - start < 6 * dayMs || end - start > 8 * dayMs)) return 'Weekly contest should span ~7 days'
-  if (freq === 'MONTHLY' && (end - start < 28 * dayMs || end - start > 32 * dayMs)) return 'Monthly contest should span ~30 days'
+  if (freq === 'DAILY' && end - start > 2 * dayMs) return '每日竞赛持续时间应≤2天'
+  if (freq === 'WEEKLY' && (end - start < 6 * dayMs || end - start > 8 * dayMs)) return '每周竞赛应持续约7天'
+  if (freq === 'MONTHLY' && (end - start < 28 * dayMs || end - start > 32 * dayMs)) return '每月竞赛应持续约30天'
   return null
 }
 
@@ -186,7 +186,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       const list = await eventService.loadContests()
       setContests(list)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load contests')
+      setError(e instanceof Error ? e.message : '获取竞赛失败')
     } finally {
       setLoading(false)
     }
@@ -209,7 +209,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       })
       setRuleForm({ contestId: id, rankStart: 1, rankEnd: 1, prizeValueCent: 0 })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load contest')
+      setError(e instanceof Error ? e.message : '获取竞赛失败')
     }
   }, [])
 
@@ -259,14 +259,14 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       }
       setEditing(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setError(e instanceof Error ? e.message : '保存失败')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDeleteContestById = async (contestId: number) => {
-    if (!contestId || !confirm('Delete this contest?')) return
+    if (!contestId || !confirm('确定要删除此竞赛吗？')) return
     setSaving(true)
     setError('')
     try {
@@ -277,14 +277,14 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       }
       await loadContests()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      setError(e instanceof Error ? e.message : '删除失败')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDeleteContest = async () => {
-    if (!selected || !confirm('Delete this contest?')) return
+    if (!selected || !confirm('确定要删除此竞赛吗？')) return
     setSaving(true)
     setError('')
     try {
@@ -293,7 +293,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       setRules([])
       await loadContests()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      setError(e instanceof Error ? e.message : '删除失败')
     } finally {
       setSaving(false)
     }
@@ -313,21 +313,21 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       await loadSelected(selected.id)
       setRuleForm({ contestId: selected.id, rankStart: 1, rankEnd: 1, prizeValueCent: 0})
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Add rule failed')
+      setError(e instanceof Error ? e.message : '增加规则失败')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDeleteRule = async (id: number) => {
-    if (!confirm('Delete this prize rule?')) return
+    if (!confirm('确定要删除此奖励规则吗？')) return
     setSaving(true)
     setError('')
     try {
       await eventService.deletePrizeRule(id)
       if (selected) await loadSelected(selected.id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      setError(e instanceof Error ? e.message : '删除失败')
     } finally {
       setSaving(false)
     }
@@ -376,13 +376,13 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-100">Event Management</h2>
+        <h2 className="text-lg font-semibold text-slate-100">竞赛管理</h2>
         <button
           type="button"
           onClick={handleCreate}
           className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg"
         >
-          New Contest
+          新建竞赛
         </button>
       </div>
       {error && (
@@ -393,7 +393,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
       <div className="rounded-lg border border-slate-700 bg-slate-850 px-3 py-3 mb-2">
         <div className="flex flex-wrap gap-3 items-end text-sm">
           <div>
-            <label className="block text-slate-400 mb-1">ID</label>
+            <label className="block text-slate-400 mb-1">竞赛ID</label>
             <input
               value={searchId}
               onChange={e => {
@@ -402,22 +402,22 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 setSearchId(val)
               }}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
-              placeholder="Search id"
+              placeholder="搜索竞赛ID"
               inputMode="numeric"
               pattern="[0-9]*"
             />
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">Title</label>
+            <label className="block text-slate-400 mb-1">竞赛名称</label>
             <input
               value={searchTitle}
               onChange={e => setSearchTitle(e.target.value)}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
-              placeholder="Search title"
+              placeholder="搜索竞赛名称"
             />
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">Scope</label>
+            <label className="block text-slate-400 mb-1">竞赛范围</label>
             <select
               value={searchScope}
               onChange={e => {
@@ -426,12 +426,12 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
               }}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
             >
-              <option value="">— All —</option>
+              <option value="">— 全部 —</option>
               {SCOPES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">Region</label>
+            <label className="block text-slate-400 mb-1">所属区域</label>
             <input
               type="text"
               list="region-options"
@@ -444,14 +444,14 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 const typed = e.target.value
                 setSearchRegion(getCodeFromLabel(typed))
               }}
-              placeholder="Search/select region"
+              placeholder="搜索/选择区域"
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
               disabled={!!searchScope && searchScope === 'NONE'}
               style={{ opacity: !!searchScope && searchScope === 'NONE' ? 0.6 : 1 }}
               autoComplete="off"
             />
             <datalist id="region-options">
-              <option value="">— All —</option>
+              <option value="">— 全部 —</option>
               {regionOptions.map(region => (
                 <option key={region.code} value={`${region.name} (${region.code})`} />
               ))}
@@ -462,56 +462,56 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
             </datalist>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">Frequency</label>
+            <label className="block text-slate-400 mb-1">竞赛频率</label>
             <select
               value={searchFreq}
               onChange={e => setSearchFreq(e.target.value)}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
             >
-              <option value="">— All —</option>
+              <option value="">— 全部 —</option>
               {FREQS.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">Audience</label>
+            <label className="block text-slate-400 mb-1">目标群体</label>
             <select
               value={searchAudience}
               onChange={e => setSearchAudience(e.target.value)}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
             >
-              <option value="">— All —</option>
+              <option value="">— 全部 —</option>
               {AUDIENCES.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">Status</label>
+            <label className="block text-slate-400 mb-1">竞赛状态</label>
             <select
               value={searchStatus}
               onChange={e => setSearchStatus(e.target.value)}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
             >
-              <option value="">— All —</option>
+              <option value="">— 全部 —</option>
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">From (Start)</label>
+            <label className="block text-slate-400 mb-1">从（开始日期时间）</label>
             <input
               type="datetime-local"
               value={searchStartAt}
               onChange={e =>setSearchStartAt(e.target.value)}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
-              placeholder="Start datetime"
+              placeholder="开始时间"
             />
           </div>
           <div>
-            <label className="block text-slate-400 mb-1">To (End)</label>
+            <label className="block text-slate-400 mb-1">到（结束日期时间）</label>
             <input
               type="datetime-local"
               value={searchEndAt}
               onChange={e => setSearchEndAt(e.target.value)}
               className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
-              placeholder="End datetime"
+              placeholder="结束时间"
             />
           </div>
           <div>
@@ -530,13 +530,13 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
               }}
               className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded"
             >
-              Clear
+              清空
             </button>
           </div>
         </div>
         <div className="text-xs text-slate-500 pt-1">
           {searchStatus === 'ONGOING' || !searchStatus
-            ? <span>All contests are shown.</span>
+            ? <span>显示全部竞赛。</span>
             : <span>
                 <span className={
                   searchStatus === 'SCHEDULED'
@@ -550,7 +550,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                           : ''
                 }>
                   {searchStatus}
-                </span> contests are shown.
+                </span> 状态的竞赛被显示。
               </span>
           }
         </div>
@@ -578,48 +578,48 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                     {sort.field === 'id' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('title')}>
-                    Title
+                    名称
                     {sort.field === 'title' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('scope')}>
-                    Scope
+                    范围
                     {sort.field === 'scope' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('regionCode')}>
-                    Region
+                    区域
                     {sort.field === 'regionCode' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('frequency')}>
-                    Frequency
+                    频率
                     {sort.field === 'frequency' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('audience')}>
-                    Audience
+                    目标群体
                     {sort.field === 'audience' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('status')}>
-                    Status
+                    状态
                     {sort.field === 'status' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('startAt')}>
-                    Start
+                    开始时间
                     {sort.field === 'startAt' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                   <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('endAt')}>
-                    End
+                    结束时间
                     {sort.field === 'endAt' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
-                  <th className="px-3 py-2">Operation</th>
+                  <th className="px-3 py-2">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="p-4 text-slate-500 text-center">Loading…</td>
+                    <td colSpan={10} className="p-4 text-slate-500 text-center">加载中…</td>
                   </tr>
                 ) : pagedContests.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="p-4 text-slate-500 text-center">No contests found</td>
+                    <td colSpan={10} className="p-4 text-slate-500 text-center">无匹配竞赛</td>
                   </tr>
                 ) : (
                   pagedContests.map((c) => (
@@ -650,7 +650,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                             loadSelected(c.id)
                           }}
                         >
-                          Edit
+                          编辑
                         </button>
                         <button
                           type="button"
@@ -660,7 +660,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                             await handleDeleteContestById(c.id)
                           }}
                         >
-                          Delete
+                          删除
                         </button>
                         <button
                           type="button"
@@ -672,7 +672,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                             }
                           }}
                         >
-                          Ranking
+                          排行榜
                         </button>
                       </td>
                     </tr>
@@ -682,7 +682,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
             </table>
             <div className="flex items-center justify-between mt-2 px-4 py-1">
               <div className="text-xs text-slate-400">
-                Page {page} of {Math.max(totalPages, 1)} &mdash; {total} contests
+                第 {page} / {Math.max(totalPages, 1)} 页 &mdash; 共 {total} 个竞赛
               </div>
               <div className="flex gap-2 items-center">
                 <button
@@ -690,7 +690,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                   disabled={page <= 1}
                   className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-200 disabled:opacity-50"
                 >
-                  Prev
+                  上一页
                 </button>
                 <span className="text-xs px-1">{page}</span>
                 <button
@@ -698,7 +698,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                   disabled={page >= totalPages}
                   className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-200 disabled:opacity-50"
                 >
-                  Next
+                  下一页
                 </button>
               </div>
             </div>
@@ -710,7 +710,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
         {selected && !editing && (
           <>
             <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
-              <h3 className="font-medium text-slate-100 mb-3">Prize Rules</h3>
+              <h3 className="font-medium text-slate-100 mb-3">奖励规则</h3>
               {(() => {
                 const nextRankStart =
                   rules.length > 0
@@ -758,18 +758,18 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
 
                 return (
                   <div className="flex flex-wrap gap-2 mb-3">
-                    <span>From</span>
+                    <span>从</span>
                     <span
                       className="inline-flex items-center px-2 py-1 w-24 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm cursor-not-allowed"
                       style={{ userSelect: 'none', pointerEvents: 'none' }}
                     >
                       {nextRankStart}
                     </span>
-                    <span> to</span>
+                    <span> 到</span>
                     <input
                       type="number"
                       min={nextRankStart}
-                      placeholder="Rank end"
+                      placeholder="结束排名"
                       value={currentRankEnd}
                       onChange={e => {
                         const val = e.target.value ? parseInt(e.target.value, 10) : undefined
@@ -781,12 +781,12 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                       }}
                       className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
                     />
-                    <span>: Prize =</span>
+                    <span>奖励 =</span>
                     <input
                       type="number"
                       min={0}
                       max={rules.length > 0 ? minPrize : undefined}
-                      placeholder="Prize (¢)"
+                      placeholder="奖励（分）"
                       value={currentPrizeValueCent}
                       onChange={e => {
                         let inputVal = e.target.value ? parseInt(e.target.value, 10) : undefined
@@ -808,7 +808,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                       disabled={saving}
                       className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
                     >
-                      Add Rule
+                      增加规则
                     </button>
                   </div>
                 )
@@ -816,28 +816,28 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
               <ul className="divide-y divide-slate-700">
                 {rules.map((r) => (
                   <li key={r.id} className="py-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-300">From {r.rankStart} to {r.rankEnd}: Prize = {r.prizeValueCent}</span>
+                    <span className="text-slate-300">排名{r.rankStart}到{r.rankEnd}：奖励 {r.prizeValueCent}</span>
                     <button
                       type="button"
                       onClick={() => handleDeleteRule(r.id)}
                       className="text-red-400 hover:text-red-300"
                     >
-                      Delete
+                      删除
                     </button>
                   </li>
                 ))}
               </ul>
-              {rules.length === 0 && <p className="text-slate-500 text-sm">No prize rules yet.</p>}
+              {rules.length === 0 && <p className="text-slate-500 text-sm">暂无奖励规则。</p>}
             </div>
           </>
         )}
 
         {(editing || (!selected && !loading)) && (
           <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
-            <h3 className="font-medium text-slate-100 mb-3">{selected ? 'Edit Contest' : 'New Contest'}</h3>
+            <h3 className="font-medium text-slate-100 mb-3">{selected ? '编辑竞赛' : '新建竞赛'}</h3>
             <div className="flex flex-wrap gap-3 items-end text-sm w-full">
               <div className="flex flex-col min-w-[120px]">
-                <label className="block text-slate-400 mb-1">Title</label>
+                <label className="block text-slate-400 mb-1">竞赛名称</label>
                 <input
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -846,7 +846,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 />
               </div>
               <div className="flex flex-col min-w-[100px]">
-                <label className="block text-slate-400 mb-1">Scope</label>
+                <label className="block text-slate-400 mb-1">竞赛范围</label>
                 <select
                   value={form.scope}
                   onChange={e => {
@@ -868,7 +868,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 </select>
               </div>
               <div className="flex flex-col min-w-[180px]">
-                <label className="block text-slate-400 mb-1">Region</label>
+                <label className="block text-slate-400 mb-1">所属区域</label>
                 <input
                   type="text"
                   list="region-combo-options"
@@ -888,10 +888,10 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                       if (form.scope) {
                         const regionForScope = regions.find(r => r.level === form.scope)
                         if (regionForScope) return `${regionForScope.name} (${regionForScope.code})`
-                        return 'Type or select region'
+                        return '输入或选择区域'
                       }
                       if (regions.length > 0) return `${regions[0].name} (${regions[0].code})`
-                      return 'Type or select region'
+                      return '输入或选择区域'
                     })()
                   }
                   className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
@@ -921,7 +921,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 })()}
               </div>
               <div className="flex flex-col min-w-[100px]">
-                <label className="block text-slate-400 mb-1">Frequency</label>
+                <label className="block text-slate-400 mb-1">竞赛频率</label>
                 <select
                   value={form.frequency}
                   onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as ContestFreq }))}
@@ -931,7 +931,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 </select>
               </div>
               <div className="flex flex-col min-w-[100px]">
-                <label className="block text-slate-400 mb-1">Audience</label>
+                <label className="block text-slate-400 mb-1">目标群体</label>
                 <select
                   value={form.audience}
                   onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value as ContestAudience }))}
@@ -941,7 +941,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 </select>
               </div>
               <div className="flex flex-col min-w-[100px]">
-                <label className="block text-slate-400 mb-1">Status</label>
+                <label className="block text-slate-400 mb-1">竞赛状态</label>
                 <select
                   value={form.status}
                   onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ContestStatus }))}
@@ -951,7 +951,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 </select>
               </div>
               <div className="flex flex-col min-w-[170px]">
-                <label className="block text-slate-400 mb-1">Start (local datetime)</label>
+                <label className="block text-slate-400 mb-1">开始时间（本地）</label>
                 <input
                   type="datetime-local"
                   value={form.startAt}
@@ -965,7 +965,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 />
               </div>
               <div className="flex flex-col min-w-[170px]">
-                <label className="block text-slate-400 mb-1">End (local datetime)</label>
+                <label className="block text-slate-400 mb-1">结束时间（本地）</label>
                 <input
                   type="datetime-local"
                   value={form.endAt}
@@ -986,7 +986,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                 disabled={saving}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
               >
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? '保存中…' : '保存'}
               </button>
               {selected && (
                 <button
@@ -994,7 +994,7 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
                   onClick={() => setEditing(false)}
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm"
                 >
-                  Cancel
+                  取消
                 </button>
               )}
             </div>

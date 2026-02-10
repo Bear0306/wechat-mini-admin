@@ -4,16 +4,16 @@ import * as userService from '../services/userService'
 
 // Editable options
 const BOOL_OPTIONS = [
-  { value: 'true', label: 'Yes' },
-  { value: 'false', label: 'No' }
+  { value: 'true', label: '是' },
+  { value: 'false', label: '否' }
 ]
 
 const AGE_GROUP_OPTIONS = [
-  { value: 'MINOR_12_18', label: '12-18 (Minor)' },
-  { value: 'ADULT', label: 'Adult' },
-  { value: 'SENIOR_60_65', label: 'Senior (60-65)' },
-  { value: 'SENIOR_65_PLUS', label: 'Senior (65+)' },
-  { value: 'BLOCKED_UNDER_12', label: 'Blocked (Under 12)' },
+  { value: 'MINOR_12_18', label: '12-18岁（未成年人）' },
+  { value: 'ADULT', label: '成年人' },
+  { value: 'SENIOR_60_65', label: '老年人（60-65岁）' },
+  { value: 'SENIOR_65_PLUS', label: '老年人（65岁以上）' },
+  { value: 'BLOCKED_UNDER_12', label: '禁止（12岁以下）' },
 ]
 
 export default function UserManagement() {
@@ -28,7 +28,7 @@ export default function UserManagement() {
   const handleSearch = async () => {
     const id = parseInt(searchId, 10)
     if (!Number.isFinite(id)) {
-      setError('Enter a valid user ID')
+      setError('请输入有效的用户ID')
       setUser(null)
       return
     }
@@ -39,7 +39,7 @@ export default function UserManagement() {
       const u = await userService.getUserById(id)
       setUser(u)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'User not found')
+      setError(e instanceof Error ? e.message : '未找到该用户')
       setUser(null)
     } finally {
       setLoading(false)
@@ -64,7 +64,7 @@ export default function UserManagement() {
       const updated = await userService.updateUser(user.id, data)
       setUser({ ...user, ...updated })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update failed')
+      setError(e instanceof Error ? e.message : '更新失败')
     } finally {
       setSaving(false)
     }
@@ -72,16 +72,16 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-slate-100">User Management</h2>
+      <h2 className="text-lg font-semibold text-slate-100">用户管理</h2>
       {/* Filters (currently only by user id, extensible) */}
       <div className="flex items-center gap-4">
-        <label className="text-sm text-slate-400">Search by user ID</label>
+        <label className="text-sm text-slate-400">用户ID搜索</label>
         <input
           type="number"
           value={searchId}
           onChange={(e) => setSearchId(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="e.g. 1"
+          placeholder="如：1"
           className="w-32 rounded border border-slate-600 bg-slate-800 px-3 py-2 text-slate-200 text-sm"
         />
         <button
@@ -90,7 +90,7 @@ export default function UserManagement() {
           disabled={loading}
           className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
         >
-          {loading ? 'Loading…' : 'Search'}
+          {loading ? '加载中…' : '查询'}
         </button>
       </div>
 
@@ -103,15 +103,15 @@ export default function UserManagement() {
           <table className="min-w-full text-sm text-left">
             <tbody>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">ID</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">用户ID</th>
                 <td className="px-3 py-2">{user.id}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Wechat Nick</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">微信昵称</th>
                 <td className="px-3 py-2">{user.wechatNick}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Real Name Verified</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">实名认证</th>
                 <td className="px-3 py-2">
                   <InlineSelect
                     value={String(user.realNameVerified)}
@@ -122,11 +122,11 @@ export default function UserManagement() {
                 </td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Birth Date</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">出生日期</th>
                 <td className="px-3 py-2">{user.birthDate ? new Date(user.birthDate).toLocaleDateString() : ''}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Age Group</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">年龄组</th>
                 <td className="px-3 py-2">
                   <InlineSelect
                     value={user.ageGroup || ''}
@@ -137,7 +137,7 @@ export default function UserManagement() {
                 </td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Can Participate</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">参赛资格</th>
                 <td className="px-3 py-2">
                   <InlineSelect
                     value={String(user.canParticipate)}
@@ -148,7 +148,7 @@ export default function UserManagement() {
                 </td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Can Buy Membership</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">可购会员</th>
                 <td className="px-3 py-2">
                   <InlineSelect
                     value={String(user.canBuyMembership)}
@@ -159,35 +159,35 @@ export default function UserManagement() {
                 </td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Total Rewards (¢)</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">累计奖励（分）</th>
                 <td className="px-3 py-2">{user.totalRewardsCent}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">City</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">城市</th>
                 <td className="px-3 py-2">{user.city || ''}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Join Count</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">参赛次数</th>
                 <td className="px-3 py-2">{user.joinCount}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Prize Multiplier</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">奖励倍率</th>
                 <td className="px-3 py-2">{user.prizeMultiplier}</td>
               </tr>
               <tr>
-                <th className="px-3 py-2 text-slate-500 font-normal">Referral Code</th>
+                <th className="px-3 py-2 text-slate-500 font-normal">推荐码</th>
                 <td className="px-3 py-2">{user.referralCode ?? ''}</td>
               </tr>
             </tbody>
           </table>
           <p className="text-xs text-slate-500 mt-2">
-            Last updated: {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : ''}
+            上次更新时间：{user.updatedAt ? new Date(user.updatedAt).toLocaleString() : ''}
           </p>
         </div>
       )}
 
       {!user && !loading && searchId && (
-        <p className="text-slate-500 text-sm">Search for a user above</p>
+        <p className="text-slate-500 text-sm">请在上方查询用户</p>
       )}
     </div>
   )

@@ -68,7 +68,7 @@ export default function Dashboard() {
         </main>
       </div>
       <footer className="border-t border-slate-800 py-2 px-4 text-slate-500 text-xs text-center">
-        WeChat Mini Admin — Domain-driven dashboard
+        微信小程序后台 — 领域驱动管理面板
       </footer>
     </div>
   )
