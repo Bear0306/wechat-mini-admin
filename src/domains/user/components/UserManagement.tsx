@@ -1,24 +1,30 @@
-import { useState, useEffect } from 'react'
-import { InlineSelect, InlineInput } from '../../../shared/components'
+import { useState } from 'react'
+import { InlineSelect } from '../../../shared/components'
 import * as userService from '../services/userService'
 
-const PERMISSION_OPTIONS = [
-  { value: 'true', label: 'Can participate' },
-  { value: 'false', label: 'Banned' },
+// Editable options
+const BOOL_OPTIONS = [
+  { value: 'true', label: 'Yes' },
+  { value: 'false', label: 'No' }
+]
+
+const AGE_GROUP_OPTIONS = [
+  { value: 'MINOR_12_18', label: '12-18 (Minor)' },
+  { value: 'ADULT', label: 'Adult' },
+  { value: 'SENIOR_60_65', label: 'Senior (60-65)' },
+  { value: 'SENIOR_65_PLUS', label: 'Senior (65+)' },
+  { value: 'BLOCKED_UNDER_12', label: 'Blocked (Under 12)' },
 ]
 
 export default function UserManagement() {
   const [searchId, setSearchId] = useState('')
   const [user, setUser] = useState<Awaited<ReturnType<typeof userService.getUserById>> | null>(null)
-  const [totalRewardsDraft, setTotalRewardsDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [filterId, setFilterId] = useState('')
 
-  useEffect(() => {
-    if (user) setTotalRewardsDraft(String(user.totalRewardsCent))
-  }, [user])
-
+  // Handle search by user ID
   const handleSearch = async () => {
     const id = parseInt(searchId, 10)
     if (!Number.isFinite(id)) {
@@ -40,15 +46,23 @@ export default function UserManagement() {
     }
   }
 
-  const handleUpdate = async (field: 'isPromoter' | 'canParticipate' | 'totalRewardsCent', value: boolean | number) => {
+  // Edit handler for editable fields
+  const handleUpdate = async (
+    field: 'realNameVerified' | 'ageGroup' | 'canParticipate' | 'canBuyMembership',
+    value: string | boolean
+  ) => {
     if (!user) return
     setSaving(true)
     setError('')
     try {
-      const data = { [field]: value }
+      let val: any = value
+      // Convert booleans from string
+      if (field === 'realNameVerified' || field === 'canParticipate' || field === 'canBuyMembership') {
+        val = value === 'true' || value === true
+      }
+      const data = { [field]: val }
       const updated = await userService.updateUser(user.id, data)
       setUser({ ...user, ...updated })
-      if (field === 'totalRewardsCent') setTotalRewardsDraft(String(updated.totalRewardsCent))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Update failed')
     } finally {
@@ -59,6 +73,7 @@ export default function UserManagement() {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-100">User Management</h2>
+      {/* Filters (currently only by user id, extensible) */}
       <div className="flex items-center gap-4">
         <label className="text-sm text-slate-400">Search by user ID</label>
         <input
@@ -78,62 +93,99 @@ export default function UserManagement() {
           {loading ? 'Loading…' : 'Search'}
         </button>
       </div>
+
       {error && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>
       )}
+
       {user && (
-        <div className="rounded-lg border border-slate-700 bg-slate-850 p-4 space-y-4">
-          <h3 className="font-medium text-slate-100">
-            User #{user.id} {user.wechatNick ? `— ${user.wechatNick}` : ''}
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-            <div>
-              <label className="block text-slate-500 mb-1">Promoter</label>
-              <InlineSelect
-                value={String(user.isPromoter)}
-                options={[
-                  { value: 'true', label: 'Yes' },
-                  { value: 'false', label: 'No' },
-                ]}
-                onChange={(v) => handleUpdate('isPromoter', v === 'true')}
-                disabled={saving}
-              />
-            </div>
-            <div>
-              <label className="block text-slate-500 mb-1">Permission</label>
-              <InlineSelect
-                value={String(user.canParticipate)}
-                options={PERMISSION_OPTIONS}
-                onChange={(v) => handleUpdate('canParticipate', v === 'true')}
-                disabled={saving}
-              />
-            </div>
-            <div>
-              <label className="block text-slate-500 mb-1">Total rewards (¢)</label>
-              <div className="flex gap-2">
-                <InlineInput
-                  type="number"
-                  value={totalRewardsDraft}
-                  onChange={(v) => setTotalRewardsDraft(String(v))}
-                  disabled={saving}
-                  min={0}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleUpdate('totalRewardsCent', parseInt(totalRewardsDraft, 10) || 0)}
-                  disabled={saving}
-                  className="px-2 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-slate-500">
-            joinCount: {user.joinCount} · prizeMultiplier: {user.prizeMultiplier} · updated: {new Date(user.updatedAt).toLocaleString()}
+        <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-850 p-4">
+          <table className="min-w-full text-sm text-left">
+            <tbody>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">ID</th>
+                <td className="px-3 py-2">{user.id}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Wechat Nick</th>
+                <td className="px-3 py-2">{user.wechatNick}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Real Name Verified</th>
+                <td className="px-3 py-2">
+                  <InlineSelect
+                    value={String(user.realNameVerified)}
+                    options={BOOL_OPTIONS}
+                    onChange={(v) => handleUpdate('realNameVerified', v)}
+                    disabled={saving}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Birth Date</th>
+                <td className="px-3 py-2">{user.birthDate ? new Date(user.birthDate).toLocaleDateString() : ''}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Age Group</th>
+                <td className="px-3 py-2">
+                  <InlineSelect
+                    value={user.ageGroup || ''}
+                    options={AGE_GROUP_OPTIONS}
+                    onChange={(v) => handleUpdate('ageGroup', v)}
+                    disabled={saving}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Can Participate</th>
+                <td className="px-3 py-2">
+                  <InlineSelect
+                    value={String(user.canParticipate)}
+                    options={BOOL_OPTIONS}
+                    onChange={(v) => handleUpdate('canParticipate', v)}
+                    disabled={saving}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Can Buy Membership</th>
+                <td className="px-3 py-2">
+                  <InlineSelect
+                    value={String(user.canBuyMembership)}
+                    options={BOOL_OPTIONS}
+                    onChange={(v) => handleUpdate('canBuyMembership', v)}
+                    disabled={saving}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Total Rewards (¢)</th>
+                <td className="px-3 py-2">{user.totalRewardsCent}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">City</th>
+                <td className="px-3 py-2">{user.city || ''}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Join Count</th>
+                <td className="px-3 py-2">{user.joinCount}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Prize Multiplier</th>
+                <td className="px-3 py-2">{user.prizeMultiplier}</td>
+              </tr>
+              <tr>
+                <th className="px-3 py-2 text-slate-500 font-normal">Referral Code</th>
+                <td className="px-3 py-2">{user.referralCode ?? ''}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-xs text-slate-500 mt-2">
+            Last updated: {user.updatedAt ? new Date(user.updatedAt).toLocaleString() : ''}
           </p>
         </div>
       )}
+
       {!user && !loading && searchId && (
         <p className="text-slate-500 text-sm">Search for a user above</p>
       )}

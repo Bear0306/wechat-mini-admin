@@ -15,6 +15,11 @@ export async function loadRegionsByLevel(level: RegionLevel): Promise<Region[]> 
   return adminApi.region.listByLevel(level)
 }
 
+export async function loadAllRegions(): Promise<Region[]> {
+  return adminApi.region.listAll()
+}
+
+
 export async function loadContests(page = 1, size = 100): Promise<Contest[]> {
   return adminApi.contest.list({ page, size })
 }

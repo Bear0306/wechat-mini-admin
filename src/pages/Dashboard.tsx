@@ -16,25 +16,45 @@ export type View =
   | 'user'
   | 'serviceAgent'
 
-const VIEW_COMPONENTS: Record<View, React.ComponentType> = {
-  events: EventManagement,
-  ranking: RankingResults,
-  reward: RewardClaimManagement,
-  user: UserManagement,
-  serviceAgent: ServiceAgentManagement,
-}
-
 export default function Dashboard() {
   const { logout } = useAuth()
   const navigate = useNavigate()
   const [view, setView] = useState<View>('events')
+  const [rankingContestId, setRankingContestId] = useState<number | null>(null);
 
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
   }
 
-  const Content = VIEW_COMPONENTS[view]
+  const renderContent = () => {
+    switch (view) {
+      case 'events':
+        return (
+          <EventManagement
+            onSelect={(v: View, contestId?: number | null) => {
+              setView(v);
+              if (contestId) setRankingContestId(contestId);
+            }}
+          />  
+        )
+      case 'ranking':
+        // Ensure contestId is a number, as required by RankingResults
+        return rankingContestId !== null ? (
+          <RankingResults contestId={rankingContestId} />
+        ) : (
+          <RankingResults />
+        );
+      case 'reward':
+        return <RewardClaimManagement />;
+      case 'user':
+        return <UserManagement />;
+      case 'serviceAgent':
+        return <ServiceAgentManagement />
+      default:
+        return null
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950">
@@ -43,7 +63,7 @@ export default function Dashboard() {
         <DashboardSidebar view={view} onSelect={setView} />
         <main className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto border-l border-slate-800 p-4">
-            <Content />
+            {renderContent()}
           </div>
         </main>
       </div>

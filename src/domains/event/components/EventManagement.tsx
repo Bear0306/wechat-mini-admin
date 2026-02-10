@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   type Contest,
   type ContestWithRules,
@@ -13,6 +13,13 @@ import {
   type ContestStatus,
 } from '../../../api/client'
 import * as eventService from '../services/eventService'
+
+// ----- ADD: import RankingResults -----
+import type { View } from '../../../pages/Dashboard';
+
+interface EventManagementProps {
+  onSelect: (v: View, contestId?: number) => void;
+}
 
 const SCOPES: RegionLevel[] = ['NONE', 'CITY', 'PROVINCE', 'DISTRICT']
 const FREQS: ContestFreq[] = ['DAILY', 'WEEKLY', 'MONTHLY']
@@ -30,10 +37,26 @@ const defaultContestForm: ContestCreate = {
   endAt: '',
 }
 
-function validateDateRange(freq: ContestFreq, startAt: string, endAt: string): string | null {
-  if (!startAt || !endAt) return 'Start and end dates required'
-  const start = new Date(startAt).getTime()
-  const end = new Date(endAt).getTime()
+function isoToInputLocalStr(iso: string): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hour = `${date.getHours()}`.padStart(2, '0')
+  const min = `${date.getMinutes()}`.padStart(2, '0')
+  return `${year}-${month}-${day}T${hour}:${min}`
+}
+
+function inputLocalStrToIso(input: string): string {
+  if (!input) return ''
+  return new Date(input).toISOString()
+}
+
+function validateDateRange(freq: ContestFreq, startAtIso: string, endAtIso: string): string | null {
+  if (!startAtIso || !endAtIso) return 'Start and end dates required'
+  const start = new Date(startAtIso).getTime()
+  const end = new Date(endAtIso).getTime()
   if (end <= start) return 'End must be after start'
   const dayMs = 24 * 60 * 60 * 1000
   if (freq === 'DAILY' && end - start > 2 * dayMs) return 'Daily contest should span ≤2 days'
@@ -42,7 +65,12 @@ function validateDateRange(freq: ContestFreq, startAt: string, endAt: string): s
   return null
 }
 
-export default function EventManagement() {
+type SortState = {
+  field: keyof Contest | null
+  direction: 'asc' | 'desc'
+}
+
+export default function EventManagement({ onSelect }: EventManagementProps) {
   const [contests, setContests] = useState<Contest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,15 +81,103 @@ export default function EventManagement() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [regions, setRegions] = useState<Region[]>([])
+  // --- View switching state ----
+  const [rankingContestId, setRankingContestId] = useState<number | null>(null);
 
-  const loadRegions = useCallback(async (level: RegionLevel) => {
-    try {
-      const list = await eventService.loadRegionsByLevel(level)
-      setRegions(list)
-    } catch {
-      setRegions([])
+  const regionMap = useMemo(() => {
+    const map: Record<string, Region> = {}
+    for (const r of regions) map[r.code] = r
+    return map
+  }, [regions])
+
+  const [searchId, setSearchId] = useState('')
+  const [searchTitle, setSearchTitle] = useState('')
+  const [searchScope, setSearchScope] = useState('')
+  const [searchRegion, setSearchRegion] = useState('')
+  const [searchFreq, setSearchFreq] = useState('')
+  const [searchAudience, setSearchAudience] = useState('')
+  const [searchStatus, setSearchStatus] = useState('')
+  const [searchStartAt, setSearchStartAt] = useState('');
+  const [searchEndAt, setSearchEndAt] = useState('');
+  const [sort, setSort] = useState<SortState>({ field: null, direction: 'asc' })
+
+  const regionOptions = useMemo(() => {
+    if (!searchScope || searchScope === "" || searchScope === "NONE") {
+      return regions
     }
+    return regions.filter(r => r.level === searchScope)
+  }, [searchScope, regions])
+
+  useEffect(() => {
+    if (searchScope === 'NONE') {
+      const noneRegions = regions.filter(r => r.level === 'NONE')
+      if (noneRegions.length === 1) {
+        if (searchRegion !== noneRegions[0].code) {
+          setSearchRegion(noneRegions[0].code)
+        }
+      }
+    }
+  }, [searchScope, regions, searchRegion])
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await eventService.loadAllRegions()
+        setRegions(all)
+      } catch {
+        setRegions([])
+      }
+    })()
   }, [])
+
+  const filterContest = (contest: Contest) => {
+    if (searchId && contest.id.toString() !== searchId.trim()) return false
+    if (searchStatus && contest.status !== searchStatus) return false
+    if (searchTitle && !contest.title.toLowerCase().includes(searchTitle.toLowerCase())) return false
+    if (searchScope && contest.scope !== searchScope) return false
+    if (searchRegion && contest.regionCode !== searchRegion) return false
+    if (searchFreq && contest.frequency !== searchFreq) return false
+    if (searchAudience && contest.audience !== searchAudience) return false
+    if (searchStartAt) {
+      const filterStartIso = inputLocalStrToIso(searchStartAt)
+      if (new Date(contest.startAt).getTime() < new Date(filterStartIso).getTime()) {
+        return false
+      }
+    }
+    if (searchEndAt) {
+      const filterEndIso = inputLocalStrToIso(searchEndAt)
+      if (new Date(contest.endAt).getTime() > new Date(filterEndIso).getTime()) {
+        return false
+      }
+    }
+    return true
+  }
+
+  const sortedFilteredContests = useMemo(() => {
+    let filtered = contests.filter(filterContest)
+
+    if (sort.field) {
+      filtered = filtered.slice().sort((a, b) => {
+        let valA: any = a[sort.field!]
+        let valB: any = b[sort.field!]
+        if (typeof valA === 'undefined' || valA === null) valA = ''
+        if (typeof valB === 'undefined' || valB === null) valB = ''
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          valA = valA.toLowerCase()
+          valB = valB.toLowerCase()
+        }
+        // For id, compare as number
+        if (sort.field === 'id') {
+          return (sort.direction === 'asc' ? 1 : -1) * (Number(valA) - Number(valB))
+        }
+        if (valA < valB) return sort.direction === 'asc' ? -1 : 1
+        if (valA > valB) return sort.direction === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return filtered
+  }, [contests, sort, searchId, searchTitle, searchScope, searchRegion, searchFreq, searchAudience, searchStatus, searchStartAt, searchEndAt])
 
   const loadContests = useCallback(async () => {
     setLoading(true)
@@ -88,8 +204,8 @@ export default function EventManagement() {
         frequency: c.frequency,
         audience: c.audience,
         status: c.status,
-        startAt: c.startAt.slice(0, 16),
-        endAt: c.endAt.slice(0, 16),
+        startAt: isoToInputLocalStr(c.startAt),
+        endAt: isoToInputLocalStr(c.endAt),
       })
       setRuleForm({ contestId: id, rankStart: 1, rankEnd: 1, prizeValueCent: 0 })
     } catch (e) {
@@ -100,12 +216,6 @@ export default function EventManagement() {
   useEffect(() => {
     loadContests()
   }, [loadContests])
-
-  useEffect(() => {
-    if (editing || (!selected && !loading)) {
-      loadRegions(form.scope)
-    }
-  }, [form.scope, editing, selected, loading, loadRegions])
 
   const handleCreate = () => {
     setSelected(null)
@@ -120,7 +230,9 @@ export default function EventManagement() {
   }
 
   const handleSaveContest = async () => {
-    const dateErr = validateDateRange(form.frequency, form.startAt, form.endAt)
+    const startAtIso = inputLocalStrToIso(form.startAt)
+    const endAtIso = inputLocalStrToIso(form.endAt)
+    const dateErr = validateDateRange(form.frequency, startAtIso, endAtIso)
     if (dateErr) {
       setError(dateErr)
       return
@@ -129,17 +241,43 @@ export default function EventManagement() {
     setError('')
     try {
       if (selected) {
-        const update: ContestUpdate = { ...form }
+        const update: ContestUpdate = {
+          ...form,
+          startAt: startAtIso,
+          endAt: endAtIso
+        }
         await eventService.updateContest(selected.id, update)
         await loadSelected(selected.id)
       } else {
-        const created = await eventService.createContest(form)
+        const created = await eventService.createContest({
+          ...form,
+          startAt: startAtIso,
+          endAt: endAtIso
+        })
         await loadContests()
         await loadSelected(created.id)
       }
       setEditing(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteContestById = async (contestId: number) => {
+    if (!contestId || !confirm('Delete this contest?')) return
+    setSaving(true)
+    setError('')
+    try {
+      await eventService.deleteContest(contestId)
+      if (selected?.id === contestId) {
+        setSelected(null)
+        setRules([])
+      }
+      await loadContests()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed')
     } finally {
       setSaving(false)
     }
@@ -195,6 +333,46 @@ export default function EventManagement() {
     }
   }
 
+  const handleSortChange = (field: keyof Contest) => {
+    setSort(prev => {
+      if (prev.field === field) {
+        return { field, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      } else {
+        return { field, direction: 'asc' }
+      }
+    })
+  }
+
+  function statusClass(s: ContestStatus) {
+    switch (s) {
+      case 'ONGOING': return 'text-green-400'
+      case 'SCHEDULED': return 'text-blue-400'
+      case 'FINALIZED': return 'text-gray-400'
+      case 'CANCELED': return 'text-red-400'
+      case 'FINALIZING': return 'text-yellow-400'
+      default: return ''
+    }
+  }
+
+  function getRegionDisplay(regionCode: string): string {
+    const found = regionMap[regionCode]
+    if (found) return `${found.name} (${found.code})`
+    return regionCode ? regionCode : ''
+  }
+
+  function getRegionLabelByCode(regionCode: string) {
+    const found = regionMap[regionCode]
+    if (found) return `${found.name} (${found.code})`
+    return regionCode || ''
+  }
+
+  function getCodeFromLabel(val: string): string {
+    const match = regions.find(r => `${r.name} (${r.code})` === val)
+    if (match) return match.code
+    return val
+  }
+
+  // view jump logic: if rankingContestId is set, only render RankingResults for that contest
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -210,318 +388,618 @@ export default function EventManagement() {
       {error && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">{error}</p>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-1">
-          <div className="rounded-lg border border-slate-700 bg-slate-850 overflow-hidden">
-            <div className="px-3 py-2 border-b border-slate-700 text-sm font-medium text-slate-300">Contests</div>
-            <div className="max-h-64 overflow-y-auto">
-              {loading ? (
-                <p className="p-3 text-slate-500 text-sm">Loading…</p>
-              ) : contests.length === 0 ? (
-                <p className="p-3 text-slate-500 text-sm">No contests</p>
-              ) : (
-                <ul className="divide-y divide-slate-700">
-                  {contests.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelect(c)}
-                        className={`w-full text-left px-3 py-2 text-sm block truncate ${
-                          selected?.id === c.id ? 'bg-blue-600/20 text-blue-400' : 'text-slate-300 hover:bg-slate-700/50'
-                        }`}
-                      >
-                        {c.title} ({c.frequency} / {c.status})
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+
+      {/* FILTERS */}
+      <div className="rounded-lg border border-slate-700 bg-slate-850 px-3 py-3 mb-2">
+        <div className="flex flex-wrap gap-3 items-end text-sm">
+          <div>
+            <label className="block text-slate-400 mb-1">ID</label>
+            <input
+              value={searchId}
+              onChange={e => {
+                // numbers only
+                const val = e.target.value.replace(/\D/g, '')
+                setSearchId(val)
+              }}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+              placeholder="Search id"
+              inputMode="numeric"
+              pattern="[0-9]*"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">Title</label>
+            <input
+              value={searchTitle}
+              onChange={e => setSearchTitle(e.target.value)}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+              placeholder="Search title"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">Scope</label>
+            <select
+              value={searchScope}
+              onChange={e => {
+                setSearchScope(e.target.value)
+                setSearchRegion('')
+              }}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+            >
+              <option value="">— All —</option>
+              {SCOPES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">Region</label>
+            <input
+              type="text"
+              list="region-options"
+              value={
+                searchRegion
+                  ? getRegionLabelByCode(searchRegion)
+                  : ""
+              }
+              onChange={e => {
+                const typed = e.target.value
+                setSearchRegion(getCodeFromLabel(typed))
+              }}
+              placeholder="Search/select region"
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+              disabled={!!searchScope && searchScope === 'NONE'}
+              style={{ opacity: !!searchScope && searchScope === 'NONE' ? 0.6 : 1 }}
+              autoComplete="off"
+            />
+            <datalist id="region-options">
+              <option value="">— All —</option>
+              {regionOptions.map(region => (
+                <option key={region.code} value={`${region.name} (${region.code})`} />
+              ))}
+              {searchRegion &&
+                !regionOptions.some(r => r.code === searchRegion) && (
+                  <option value={getRegionLabelByCode(searchRegion)}>{getRegionLabelByCode(searchRegion)}</option>
+                )}
+            </datalist>
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">Frequency</label>
+            <select
+              value={searchFreq}
+              onChange={e => setSearchFreq(e.target.value)}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+            >
+              <option value="">— All —</option>
+              {FREQS.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">Audience</label>
+            <select
+              value={searchAudience}
+              onChange={e => setSearchAudience(e.target.value)}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+            >
+              <option value="">— All —</option>
+              {AUDIENCES.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">Status</label>
+            <select
+              value={searchStatus}
+              onChange={e => setSearchStatus(e.target.value)}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+            >
+              <option value="">— All —</option>
+              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">From (Start)</label>
+            <input
+              type="datetime-local"
+              value={searchStartAt}
+              onChange={e =>setSearchStartAt(e.target.value)}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+              placeholder="Start datetime"
+            />
+          </div>
+          <div>
+            <label className="block text-slate-400 mb-1">To (End)</label>
+            <input
+              type="datetime-local"
+              value={searchEndAt}
+              onChange={e => setSearchEndAt(e.target.value)}
+              className="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100"
+              placeholder="End datetime"
+            />
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchId('')
+                setSearchTitle('')
+                setSearchScope('')
+                setSearchRegion('')
+                setSearchFreq('')
+                setSearchAudience('')
+                setSearchStatus('')
+                setSearchStartAt('')
+                setSearchEndAt('')
+              }}
+              className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded"
+            >
+              Clear
+            </button>
           </div>
         </div>
-        <div className="lg:col-span-2 space-y-4">
-          {selected && !editing && (
-            <>
-              <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-medium text-slate-100">{selected.title}</h3>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditing(true)}
-                      className="text-sm text-blue-400 hover:text-blue-300"
+        <div className="text-xs text-slate-500 pt-1">
+          {searchStatus === 'ONGOING' || !searchStatus
+            ? <span>All contests are shown.</span>
+            : <span>
+                <span className={
+                  searchStatus === 'SCHEDULED'
+                    ? 'text-blue-400 font-semibold'
+                    : searchStatus === 'FINALIZED'
+                      ? 'text-gray-400 font-semibold'
+                      : searchStatus === 'CANCELED'
+                        ? 'text-red-400 font-semibold'
+                        : searchStatus === 'FINALIZING'
+                          ? 'text-yellow-400 font-semibold'
+                          : ''
+                }>
+                  {searchStatus}
+                </span> contests are shown.
+              </span>
+          }
+        </div>
+      </div>
+
+      {/* TABLE */}
+      {(() => {
+        const PAGE_SIZE = 10;
+        const [page, setPage] = useState(1);
+        const total = sortedFilteredContests.length;
+        const totalPages = Math.ceil(total / PAGE_SIZE);
+        const pagedContests = sortedFilteredContests.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+        useEffect(() => {
+          if (page > totalPages) setPage(1);
+        }, [totalPages, page]);
+
+        return (
+          <div className="rounded-lg border border-slate-700 bg-slate-850 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-700 text-sm">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('id')}>
+                    ID
+                    {sort.field === 'id' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('title')}>
+                    Title
+                    {sort.field === 'title' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('scope')}>
+                    Scope
+                    {sort.field === 'scope' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('regionCode')}>
+                    Region
+                    {sort.field === 'regionCode' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('frequency')}>
+                    Frequency
+                    {sort.field === 'frequency' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('audience')}>
+                    Audience
+                    {sort.field === 'audience' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('status')}>
+                    Status
+                    {sort.field === 'status' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('startAt')}>
+                    Start
+                    {sort.field === 'startAt' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2 cursor-pointer select-none" onClick={() => handleSortChange('endAt')}>
+                    End
+                    {sort.field === 'endAt' && (sort.direction === 'asc' ? ' ▲' : ' ▼')}
+                  </th>
+                  <th className="px-3 py-2">Operation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="p-4 text-slate-500 text-center">Loading…</td>
+                  </tr>
+                ) : pagedContests.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="p-4 text-slate-500 text-center">No contests found</td>
+                  </tr>
+                ) : (
+                  pagedContests.map((c) => (
+                    <tr
+                      key={c.id}
+                      className={selected?.id === c.id ? "bg-blue-700/20" : ""}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleSelect(c)}
                     >
-                      Edit
-                    </button>
+                      <td className="px-3 py-2 font-mono">{c.id}</td>
+                      <td className="px-3 py-2 truncate">{c.title}</td>
+                      <td className="px-3 py-2">{c.scope}</td>
+                      <td className="px-3 py-2">
+                        {getRegionDisplay(c.regionCode)}
+                      </td>
+                      <td className="px-3 py-2">{c.frequency}</td>
+                      <td className="px-3 py-2">{c.audience}</td>
+                      <td className={"px-3 py-2 " + statusClass(c.status)}>{c.status}</td>
+                      <td className="px-3 py-2">{isoToInputLocalStr(c.startAt).replace('T', ' ')}</td>
+                      <td className="px-3 py-2">{isoToInputLocalStr(c.endAt).replace('T', ' ')}</td>
+                      <td className="px-3 py-2 flex gap-1 items-center">
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-blue-800 hover:bg-blue-600 text-slate-100 rounded text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditing(true)
+                            loadSelected(c.id)
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-red-800 hover:bg-red-600 text-white rounded text-xs"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            await handleDeleteContestById(c.id)
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-green-800 hover:bg-green-600 text-white rounded text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onSelect) {
+                              onSelect('ranking', c.id);
+                            }
+                          }}
+                        >
+                          Ranking
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-between mt-2 px-4 py-1">
+              <div className="text-xs text-slate-400">
+                Page {page} of {Math.max(totalPages, 1)} &mdash; {total} contests
+              </div>
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-200 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-xs px-1">{page}</span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs text-slate-200 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <div className="space-y-4">
+        {selected && !editing && (
+          <>
+            <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
+              <h3 className="font-medium text-slate-100 mb-3">Prize Rules</h3>
+              {(() => {
+                const nextRankStart =
+                  rules.length > 0
+                    ? 1 + Math.max(...rules.map(r => r.rankEnd))
+                    : 1
+
+                const minPrize =
+                  rules.length > 0
+                    ? Math.min(...rules.map(r => r.prizeValueCent ?? 0))
+                    : 0
+
+                const currentRankEnd =
+                  ruleForm.rankEnd !== undefined
+                    ? Math.max(ruleForm.rankEnd, nextRankStart)
+                    : nextRankStart
+
+                let currentPrizeValueCent =
+                  ruleForm.prizeValueCent !== undefined
+                    ? Math.max(
+                        0,
+                        rules.length > 0
+                          ? Math.min(ruleForm.prizeValueCent, minPrize)
+                          : ruleForm.prizeValueCent
+                      )
+                    : 0
+
+                if (ruleForm.rankStart !== nextRankStart) {
+                  setTimeout(() =>
+                    setRuleForm(f =>
+                      f.rankStart !== nextRankStart
+                        ? { ...f, rankStart: nextRankStart, rankEnd: nextRankStart }
+                        : f
+                    ),
+                    0
+                  )
+                }
+
+                if (ruleForm.prizeValueCent === undefined) {
+                  setTimeout(() => {
+                    setRuleForm(f =>
+                      f.prizeValueCent !== 0 ? { ...f, prizeValueCent: 0 } : f
+                    )
+                  }, 0)
+                }
+
+                return (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <span>From</span>
+                    <span
+                      className="inline-flex items-center px-2 py-1 w-24 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm cursor-not-allowed"
+                      style={{ userSelect: 'none', pointerEvents: 'none' }}
+                    >
+                      {nextRankStart}
+                    </span>
+                    <span> to</span>
+                    <input
+                      type="number"
+                      min={nextRankStart}
+                      placeholder="Rank end"
+                      value={currentRankEnd}
+                      onChange={e => {
+                        const val = e.target.value ? parseInt(e.target.value, 10) : undefined
+                        setRuleForm(f => ({
+                          ...f,
+                          rankStart: nextRankStart,
+                          rankEnd: val !== undefined ? Math.max(val, nextRankStart) : nextRankStart
+                        }))
+                      }}
+                      className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
+                    />
+                    <span>: Prize =</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={rules.length > 0 ? minPrize : undefined}
+                      placeholder="Prize (¢)"
+                      value={currentPrizeValueCent}
+                      onChange={e => {
+                        let inputVal = e.target.value ? parseInt(e.target.value, 10) : undefined
+                        if (inputVal !== undefined) {
+                          if (inputVal < 0) inputVal = 0
+                          if (rules.length > 0 && inputVal > minPrize) inputVal = minPrize
+                        }
+                        setRuleForm(f => ({
+                          ...f,
+                          prizeValueCent: inputVal
+                        }))
+                      }}
+                      className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
+                    />
+
                     <button
                       type="button"
-                      onClick={handleDeleteContest}
-                      className="text-sm text-red-400 hover:text-red-300"
+                      onClick={handleAddRule}
+                      disabled={saving}
+                      className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
+                    >
+                      Add Rule
+                    </button>
+                  </div>
+                )
+              })()}
+              <ul className="divide-y divide-slate-700">
+                {rules.map((r) => (
+                  <li key={r.id} className="py-2 flex items-center justify-between text-sm">
+                    <span className="text-slate-300">From {r.rankStart} to {r.rankEnd}: Prize = {r.prizeValueCent}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRule(r.id)}
+                      className="text-red-400 hover:text-red-300"
                     >
                       Delete
                     </button>
-                  </div>
-                </div>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-400">
-                  <dt>Scope</dt>
-                  <dd>{selected.scope}</dd>
-                  <dt>Region</dt>
-                  <dd>{selected.regionCode ?? ''}</dd>
-                  <dt>Frequency</dt>
-                  <dd>{selected.frequency}</dd>
-                  <dt>Status</dt>
-                  <dd>{selected.status}</dd>
-                  <dt>Start</dt>
-                  <dd>{new Date(selected.startAt).toLocaleString()}</dd>
-                  <dt>End</dt>
-                  <dd>{new Date(selected.endAt).toLocaleString()}</dd>
-                </dl>
+                  </li>
+                ))}
+              </ul>
+              {rules.length === 0 && <p className="text-slate-500 text-sm">No prize rules yet.</p>}
+            </div>
+          </>
+        )}
+
+        {(editing || (!selected && !loading)) && (
+          <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
+            <h3 className="font-medium text-slate-100 mb-3">{selected ? 'Edit Contest' : 'New Contest'}</h3>
+            <div className="flex flex-wrap gap-3 items-end text-sm w-full">
+              <div className="flex flex-col min-w-[120px]">
+                <label className="block text-slate-400 mb-1">Title</label>
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                  style={{ minWidth: 0 }}
+                />
               </div>
-              <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
-                <h3 className="font-medium text-slate-100 mb-3">Prize Rules</h3>
-                {(() => {
-                  // Determine nextRankStart: 1 + max(rankEnd) if rules exist, else 1
-                  const nextRankStart =
-                    rules.length > 0
-                      ? 1 + Math.max(...rules.map(r => r.rankEnd))
-                      : 1
-
-                  // Determine the minimum prize of existing rules (if any)
-                  const minPrize =
-                    rules.length > 0
-                      ? Math.min(...rules.map(r => r.prizeValueCent ?? 0))
-                      : 0
-
-                  // Always ensure rankEnd >= rankStart (nextRankStart), default to rankStart
-                  const currentRankEnd =
-                    ruleForm.rankEnd !== undefined
-                      ? Math.max(ruleForm.rankEnd, nextRankStart)
-                      : nextRankStart
-
-                  // Prize input: Always default to 0 if undefined (do not default to minPrize)
-                  let currentPrizeValueCent =
-                    ruleForm.prizeValueCent !== undefined
-                      ? Math.max(
-                          0,
-                          rules.length > 0
-                            ? Math.min(ruleForm.prizeValueCent, minPrize)
-                            : ruleForm.prizeValueCent
-                        )
-                      : 0
-
-                  // If rankForm.rankStart out of sync with auto-calculated, set it
-                  if (ruleForm.rankStart !== nextRankStart) {
-                    setTimeout(() =>
-                      setRuleForm(f =>
-                        f.rankStart !== nextRankStart
-                          ? { ...f, rankStart: nextRankStart, rankEnd: nextRankStart }
-                          : f
-                      ),
-                      0
-                    )
+              <div className="flex flex-col min-w-[100px]">
+                <label className="block text-slate-400 mb-1">Scope</label>
+                <select
+                  value={form.scope}
+                  onChange={e => {
+                    const scope = e.target.value as RegionLevel
+                    setForm(f => {
+                      let newRegionCode = ''
+                      const firstRegionForScope = regions.find(r => r.level === scope)
+                      newRegionCode = firstRegionForScope ? firstRegionForScope.code : ''
+                      return {
+                        ...f,
+                        scope,
+                        regionCode: newRegionCode
+                      }
+                    })
+                  }}
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                >
+                  {SCOPES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col min-w-[180px]">
+                <label className="block text-slate-400 mb-1">Region</label>
+                <input
+                  type="text"
+                  list="region-combo-options"
+                  value={getRegionLabelByCode(form.regionCode)}
+                  onChange={e => {
+                    const val = e.target.value
+                    setForm(f => {
+                      const code = getCodeFromLabel(val)
+                      return {
+                        ...f,
+                        regionCode: code
+                      }
+                    })
+                  }}
+                  placeholder={
+                    (() => {
+                      if (form.scope) {
+                        const regionForScope = regions.find(r => r.level === form.scope)
+                        if (regionForScope) return `${regionForScope.name} (${regionForScope.code})`
+                        return 'Type or select region'
+                      }
+                      if (regions.length > 0) return `${regions[0].name} (${regions[0].code})`
+                      return 'Type or select region'
+                    })()
                   }
-
-                  // Do not auto-update prizeValueCent for minPrize, only default to 0 if undefined
-                  if (ruleForm.prizeValueCent === undefined) {
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                  autoComplete="off"
+                />
+                <datalist id="region-combo-options">
+                  {regions
+                    .filter(r => (form.scope ? r.level === form.scope : true))
+                    .map(r => (
+                      <option
+                        key={r.code}
+                        value={`${r.name} (${r.code})`}
+                      />
+                    ))}
+                </datalist>
+                {(() => {
+                  const scopedRegions = regions.filter(r => r.level === form.scope)
+                  if ((!form.regionCode || !scopedRegions.some(r => r.code === form.regionCode)) && scopedRegions.length > 0) {
                     setTimeout(() => {
-                      setRuleForm(f =>
-                        f.prizeValueCent !== 0 ? { ...f, prizeValueCent: 0 } : f
-                      )
+                      setForm(f => ({
+                        ...f,
+                        regionCode: scopedRegions[0].code
+                      }))
                     }, 0)
                   }
-
-                  return (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <span>From</span>
-                      <span
-                        className="inline-flex items-center px-2 py-1 w-24 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm cursor-not-allowed"
-                        style={{ userSelect: 'none', pointerEvents: 'none' }}
-                      >
-                        {nextRankStart}
-                      </span>
-                      <span> to</span>
-                      <input
-                        type="number"
-                        min={nextRankStart}
-                        placeholder="Rank end"
-                        value={currentRankEnd}
-                        onChange={e => {
-                          const val = e.target.value ? parseInt(e.target.value, 10) : undefined
-                          setRuleForm(f => ({
-                            ...f,
-                            // Always keep rankStart as nextRankStart, keep rankEnd >= rankStart
-                            rankStart: nextRankStart,
-                            rankEnd: val !== undefined ? Math.max(val, nextRankStart) : nextRankStart
-                          }))
-                        }}
-                        className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
-                      />
-                      <span>: Prize =</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={rules.length > 0 ? minPrize : undefined}
-                        placeholder="Prize (¢)"
-                        value={currentPrizeValueCent}
-                        onChange={e => {
-                          let inputVal = e.target.value ? parseInt(e.target.value, 10) : undefined
-                          // Enforce minimum 0, and if rules exist, also a maximum of minPrize
-                          if (inputVal !== undefined) {
-                            if (inputVal < 0) inputVal = 0
-                            if (rules.length > 0 && inputVal > minPrize) inputVal = minPrize
-                          }
-                          setRuleForm(f => ({
-                            ...f,
-                            prizeValueCent: inputVal
-                          }))
-                        }}
-                        className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={handleAddRule}
-                        disabled={saving}
-                        className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded disabled:opacity-50"
-                      >
-                        Add Rule
-                      </button>
-                    </div>
-                  )
+                  return null
                 })()}
-                <ul className="divide-y divide-slate-700">
-                  {rules.map((r) => (
-                    <li key={r.id} className="py-2 flex items-center justify-between text-sm">
-                      <span className="text-slate-300">From {r.rankStart} to {r.rankEnd}: Prize = {r.prizeValueCent}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRule(r.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        Delete
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {rules.length === 0 && <p className="text-slate-500 text-sm">No prize rules yet.</p>}
               </div>
-            </>
-          )}
-          {(editing || (!selected && !loading)) && (
-            <div className="rounded-lg border border-slate-700 bg-slate-850 p-4">
-              <h3 className="font-medium text-slate-100 mb-3">{selected ? 'Edit Contest' : 'New Contest'}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div className="sm:col-span-2">
-                  <label className="block text-slate-400 mb-1">Title</label>
-                  <input
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Scope</label>
-                  <select
-                    value={form.scope}
-                    onChange={(e) => {
-                      const scope = e.target.value as RegionLevel
-                      setForm((f) => ({ ...f, scope, regionCode: '' }))
-                    }}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  >
-                    {SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Region</label>
-                  <select
-                    value={form.regionCode ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, regionCode: e.target.value ?? '' }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  >
-                    <option value="">— Select —</option>
-                    {regions.map((r) => (
-                      <option key={r.code} value={r.code}>
-                        {r.name} ({r.code})
-                      </option>
-                    ))}
-                    {/* Keep current value as option when editing and it's not in the fetched list */}
-                    {form.regionCode && !regions.some((r) => r.code === form.regionCode) && (
-                      <option value={form.regionCode}>{form.regionCode}</option>
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Frequency</label>
-                  <select
-                    value={form.frequency}
-                    onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as ContestFreq }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  >
-                    {FREQS.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Audience</label>
-                  <select
-                    value={form.audience}
-                    onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value as ContestAudience }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  >
-                    {AUDIENCES.map((a) => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Status</label>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ContestStatus }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  >
-                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Start (local datetime)</label>
-                  <input
-                    type="datetime-local"
-                    value={form.startAt}
-                    onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">End (local datetime)</label>
-                  <input
-                    type="datetime-local"
-                    value={form.endAt}
-                    onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
-                    className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveContest}
-                  disabled={saving}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
+              <div className="flex flex-col min-w-[100px]">
+                <label className="block text-slate-400 mb-1">Frequency</label>
+                <select
+                  value={form.frequency}
+                  onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as ContestFreq }))}
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
                 >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-                {selected && (
-                  <button
-                    type="button"
-                    onClick={() => setEditing(false)}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm"
-                  >
-                    Cancel
-                  </button>
-                )}
+                  {FREQS.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col min-w-[100px]">
+                <label className="block text-slate-400 mb-1">Audience</label>
+                <select
+                  value={form.audience}
+                  onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value as ContestAudience }))}
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                >
+                  {AUDIENCES.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col min-w-[100px]">
+                <label className="block text-slate-400 mb-1">Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as ContestStatus }))}
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                >
+                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col min-w-[170px]">
+                <label className="block text-slate-400 mb-1">Start (local datetime)</label>
+                <input
+                  type="datetime-local"
+                  value={form.startAt}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      startAt: e.target.value
+                    }))
+                  }
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                />
+              </div>
+              <div className="flex flex-col min-w-[170px]">
+                <label className="block text-slate-400 mb-1">End (local datetime)</label>
+                <input
+                  type="datetime-local"
+                  value={form.endAt}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      endAt: e.target.value
+                    }))
+                  }
+                  className="px-3 py-2 rounded bg-slate-800 border border-slate-600 text-slate-100"
+                />
               </div>
             </div>
-          )}
-        </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={handleSaveContest}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              {selected && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

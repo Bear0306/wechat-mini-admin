@@ -99,6 +99,8 @@ export const adminApi = {
   region: {
     listByLevel: (level: RegionLevel) =>
       api<Region[]>(`/region?level=${encodeURIComponent(level)}`),
+    listAll: () =>
+      api<Region[]>(`/region/all`),
   },
   serviceAgent: {
     list: () => api<ServiceAgent[]>('/service-agent'),
@@ -197,19 +199,25 @@ export interface AdminUser {
   openid: string
   wechatNick: string | null
   avatarUrl: string | null
+  realNameVerified: boolean
+  birthDate: string
+  ageGroup: string
+  city: string
   canParticipate: boolean
-  isPromoter: boolean
+  canBuyMembership: boolean
   totalRewardsCent: number
   joinCount: number
   prizeMultiplier: number
+  referralCode: string,
   createdAt: string
   updatedAt: string
 }
 
 export interface AdminUserUpdate {
-  isPromoter?: boolean
+  realNameVerified?: boolean
   canParticipate?: boolean
-  totalRewardsCent?: number
+  canBuyMembership?: boolean
+  ageGroup?: string
 }
 
 export type RankRow = { rank: number; userId: number; name: string; steps: number; avatar?: string | null; abnormal?: boolean }
