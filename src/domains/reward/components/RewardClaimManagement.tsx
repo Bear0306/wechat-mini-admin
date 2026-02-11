@@ -68,19 +68,6 @@ export default function RewardClaimManagement() {
     }
   }
 
-  const handleAssignAgent = async (claimId: number, agentId: number | null) => {
-    setUpdating(claimId)
-    setError('')
-    try {
-      const updated = await rewardService.assignAgent(claimId, agentId)
-      setClaims((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '分配失败')
-    } finally {
-      setUpdating(null)
-    }
-  }
-
   const isCompleted = (status: PrizeClaimStatus) => status === COMPLETED_STATUS
 
   // Apply filters on client

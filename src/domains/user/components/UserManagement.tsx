@@ -22,7 +22,6 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [filterId, setFilterId] = useState('')
 
   // Handle search by user ID
   const handleSearch = async () => {

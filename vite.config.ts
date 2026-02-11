@@ -9,6 +9,8 @@ if (process.env.NODE_ENV !== 'production') {
 
 export default defineConfig({
   plugins: [react()],
+
+  // In dev, still run on its own port and proxy /api to backend
   server: {
     port: 3000,
     proxy: {
@@ -28,4 +30,12 @@ export default defineConfig({
       },
     },
   },
+
+  // When building for production, output into the backend's public/admin folder
+  // and assume the app is served from /admin on the same origin.
+  build: {
+    outDir: '../wechat-mini-backend/public/admin',
+    emptyOutDir: true,
+  },
+  base: '/',
 })

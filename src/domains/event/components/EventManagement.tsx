@@ -82,7 +82,6 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
   const [saving, setSaving] = useState(false)
   const [regions, setRegions] = useState<Region[]>([])
   // --- View switching state ----
-  const [rankingContestId, setRankingContestId] = useState<number | null>(null);
 
   const regionMap = useMemo(() => {
     const map: Record<string, Region> = {}
@@ -283,21 +282,6 @@ export default function EventManagement({ onSelect }: EventManagementProps) {
     }
   }
 
-  const handleDeleteContest = async () => {
-    if (!selected || !confirm('确定要删除此竞赛吗？')) return
-    setSaving(true)
-    setError('')
-    try {
-      await eventService.deleteContest(selected.id)
-      setSelected(null)
-      setRules([])
-      await loadContests()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '删除失败')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const handleAddRule = async () => {
     if (!selected || ruleForm.rankStart == null || ruleForm.rankEnd == null || ruleForm.prizeValueCent == null) return
