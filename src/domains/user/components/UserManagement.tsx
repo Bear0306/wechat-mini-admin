@@ -107,7 +107,7 @@ export default function UserManagement() {
               </tr>
               <tr>
                 <th className="px-3 py-2 text-slate-500 font-normal">微信昵称</th>
-                <td className="px-3 py-2">{user.wechatNick}</td>
+                <td className="px-3 py-2">{user.wechatNick || ''}</td>
               </tr>
               <tr>
                 <th className="px-3 py-2 text-slate-500 font-normal">实名认证</th>
